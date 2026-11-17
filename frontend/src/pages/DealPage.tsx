@@ -4,6 +4,7 @@ import { type FormEvent, type ReactNode, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 
 import {
+  copilotListProposalsOptions,
   dealsDealTimelineOptions,
   dealsDeleteDealMutation,
   dealsMarkLostMutation,
@@ -15,6 +16,7 @@ import {
   pipelinesListPipelinesOptions,
 } from "@/client/@tanstack/react-query.gen"
 import type { DealPublic, DealUpdate } from "@/client/types.gen"
+import { ProposalCard } from "@/components/copilot/ProposalCard"
 import { ActivityComposer } from "@/components/deals/ActivityComposer"
 import { DealForm } from "@/components/deals/DealForm"
 import { StageBar } from "@/components/deals/StageBar"
@@ -43,6 +45,9 @@ export function DealPage() {
   const deal = useQuery(dealsReadDealOptions({ path: { deal_id: dealId } }))
   const timeline = useQuery(dealsDealTimelineOptions({ path: { deal_id: dealId } }))
   const pipelines = useQuery(pipelinesListPipelinesOptions())
+  const pending = useQuery(
+    copilotListProposalsOptions({ query: { deal_id: dealId, status: "pending" } }),
+  )
 
   const onChanged = () => invalidate(queryClient, ...DEAL_QUERIES)
   const onError = (e: unknown) => toast(apiErrorMessage(e), "error")
@@ -164,6 +169,14 @@ export function DealPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <section className="space-y-4 lg:col-span-2" aria-label="Activity">
+          {pending.data && pending.data.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold">Waiting for your approval</h2>
+              {pending.data.map((p) => (
+                <ProposalCard key={p.id} proposal={p} canDecide={canWrite} />
+              ))}
+            </div>
+          )}
           {canWrite && <ActivityComposer deal={d} />}
           <h2 className="text-sm font-semibold">Timeline</h2>
           {timeline.isPending ? (

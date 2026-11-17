@@ -6,6 +6,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Sparkles,
   SquareKanban,
   Users,
   X,
@@ -13,6 +14,7 @@ import {
 import { useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router-dom"
 
+import { CopilotPanel } from "@/components/copilot/CopilotPanel"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/card"
 import { permissions, useAuth } from "@/lib/auth"
@@ -31,6 +33,7 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const { isAdmin } = permissions(user)
   const [open, setOpen] = useState(false)
+  const [copilotOpen, setCopilotOpen] = useState(false)
   const { pathname } = useLocation()
   const name = user?.full_name || user?.email || ""
   const nav = isAdmin ? [...NAV, { to: "/settings", label: "Settings", icon: Settings }] : NAV
@@ -62,7 +65,17 @@ export function AppLayout() {
           {label}
         </NavLink>
       ))}
-      <div className="mt-auto flex items-center gap-3 rounded-md border border-line p-2">
+      <Button
+        variant="outline"
+        className="mt-auto mb-2 justify-start"
+        onClick={() => {
+          setOpen(false)
+          setCopilotOpen(true)
+        }}
+      >
+        <Sparkles className="text-brand-600" /> Ask Copilot
+      </Button>
+      <div className="flex items-center gap-3 rounded-md border border-line p-2">
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">
           {initials(name)}
         </span>
@@ -99,12 +112,21 @@ export function AppLayout() {
           <Button variant="ghost" size="icon" onClick={() => setOpen(!open)} aria-label="Menu">
             {open ? <X /> : <Menu />}
           </Button>
-          <span className="font-semibold">Dealflow</span>
+          <span className="flex-1 font-semibold">Dealflow</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Ask Copilot"
+            onClick={() => setCopilotOpen(true)}
+          >
+            <Sparkles className="text-brand-600" />
+          </Button>
         </header>
         <main className="min-h-0 flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>
+      <CopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} />
     </div>
   )
 }

@@ -12,6 +12,7 @@ import {
   Phone,
   Plus,
   RotateCcw,
+  Sparkles,
   SquareCheck,
   Users,
 } from "lucide-react"
@@ -105,6 +106,15 @@ function Row({
   )
 }
 
+function ViaBadge({ via }: { via: string }) {
+  return (
+    <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-brand-50 px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-700">
+      <Sparkles className="size-3" aria-hidden />
+      via {via === "pipeline_agent" ? "Pipeline agent" : "Copilot"}
+    </span>
+  )
+}
+
 function When({ at }: { at: string }) {
   return (
     <time dateTime={at} title={new Date(at).toLocaleString()} className="text-xs text-ink-faint">
@@ -183,6 +193,7 @@ function EventRow({
     <Row icon={icon} tone={tone}>
       <p className="text-sm">
         <span className="font-medium">{who}</span> {text}
+        {typeof d.via === "string" && <ViaBadge via={d.via} />}
       </p>
       <When at={event.created_at} />
     </Row>
@@ -263,6 +274,7 @@ function ActivityRow({
       </div>
       <p className="mt-1 text-xs text-ink-faint">
         {actor ?? "Someone"} · {activity.type} · <When at={activity.created_at} />
+        {activity.via && <ViaBadge via={activity.via} />}
       </p>
     </Row>
   )

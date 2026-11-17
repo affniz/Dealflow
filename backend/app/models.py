@@ -14,6 +14,7 @@ from enum import StrEnum
 from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, EmailStr, computed_field, field_validator
+from pydantic import Field as PydField
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -417,6 +418,7 @@ class ActivityBase(SQLModel):
 class Activity(ActivityBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     owner_id: int = Field(foreign_key="user.id", index=True)
+    via: str | None = Field(default=None, max_length=30)  # set when an AI agent added it
     done: bool = False
     done_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow, index=True)
@@ -448,6 +450,7 @@ class ActivityUpdate(SQLModel):
 class ActivityPublic(ActivityBase):
     id: int
     owner_id: int
+    via: str | None = None
     done: bool
     done_at: datetime | None
     created_at: datetime
@@ -518,3 +521,95 @@ class LostReasonReport(BaseModel):
     lost_count: int
     lost_value: Decimal
     reasons: list[LostReasonStat]  # most common first
+
+
+# ---------------------------------------------------------------- AI agents
+
+
+class AgentConversation(SQLModel, table=True):
+    """A Copilot chat. `messages` is the exact Messages API history and is only ever appended
+    to: the model's thinking blocks are only valid in an unedited conversation."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    title: str = Field(max_length=120)
+    messages: list[dict[str, Any]] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False)
+    )
+    input_tokens: int = 0
+    output_tokens: int = 0
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class ProposalStatus(StrEnum):
+    pending = "pending"
+    approved = "approved"  # approved and applied
+    rejected = "rejected"
+    failed = "failed"  # approved, but applying it failed (e.g. the deal changed meanwhile)
+
+
+class AgentProposal(SQLModel, table=True):
+    """A change an agent wants to make. Nothing happens until a person approves it."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    source: str = Field(max_length=30)  # "copilot" or "pipeline_agent"
+    conversation_id: int | None = Field(default=None, foreign_key="agentconversation.id")
+    tool_use_id: str | None = Field(default=None, max_length=100, index=True)
+    # the person it acts for; they (or an admin) approve it, and it runs with their access
+    user_id: int = Field(foreign_key="user.id", index=True)
+    deal_id: int | None = Field(default=None, foreign_key="deal.id", index=True)
+    action: str = Field(max_length=50)
+    params: dict[str, Any] = json_column()
+    summary: str = Field(max_length=500)
+    rationale: str | None = Field(default=None, max_length=2000)
+    status: ProposalStatus = Field(default=ProposalStatus.pending, index=True)
+    error: str | None = None
+    decided_by_id: int | None = Field(default=None, foreign_key="user.id")
+    decided_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class AgentProposalPublic(SQLModel):
+    id: int
+    source: str
+    conversation_id: int | None
+    user_id: int
+    deal_id: int | None
+    deal: NamedRef | None = None
+    action: str
+    summary: str
+    rationale: str | None
+    status: ProposalStatus
+    error: str | None
+    decided_by_id: int | None
+    decided_at: datetime | None
+    created_at: datetime
+
+
+class CopilotMessageIn(BaseModel):
+    conversation_id: int | None = None
+    text: str = PydField(min_length=1, max_length=4000)
+    deal_id: int | None = PydField(
+        default=None, description="The deal the user is looking at, for context"
+    )
+
+
+class ChatItem(BaseModel):
+    kind: Literal["user", "assistant", "step"]
+    text: str
+    proposal_id: int | None = None
+
+
+class ConversationView(BaseModel):
+    id: int
+    title: str
+    items: list[ChatItem]
+    proposals: list[AgentProposalPublic]
+    updated_at: datetime
+
+
+class ConversationSummary(BaseModel):
+    id: int
+    title: str
+    updated_at: datetime

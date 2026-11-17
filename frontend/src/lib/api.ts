@@ -31,4 +31,5 @@ export const DEAL_QUERIES = [
   "activitiesListActivities",
   "dashboardPipelineSummary",
   "dashboardLostReasons",
+  "copilotListProposals",
 ]
