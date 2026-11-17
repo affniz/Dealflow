@@ -2,7 +2,7 @@ from collections.abc import Callable, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import Engine, make_url
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.core.config import settings
@@ -16,15 +16,36 @@ API = settings.API_V1_STR
 PASSWORD = "password123"
 
 
+@pytest.fixture(scope="session")
+def engine() -> Iterator[Engine]:
+    url = settings.TEST_DATABASE_URL
+    # the schema is dropped and recreated here, so refuse anything that looks like real data
+    if url == settings.DATABASE_URL or "test" not in make_url(url).database:
+        raise RuntimeError(f"TEST_DATABASE_URL must be a separate *test* database, got {url}")
+    eng = create_engine(url)
+    SQLModel.metadata.drop_all(eng)
+    SQLModel.metadata.create_all(eng)
+    yield eng
+    eng.dispose()
+
+
 @pytest.fixture
-def session() -> Iterator[Session]:
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as s:
-        init_db(s)
+def session(engine: Engine) -> Iterator[Session]:
+    """Each test runs in a transaction that is rolled back at the end.
+
+    Route handlers call session.commit(); with create_savepoint those commits only
+    release a savepoint, so nothing leaks between tests.
+    """
+    connection = engine.connect()
+    outer = connection.begin()
+    s = Session(bind=connection, join_transaction_mode="create_savepoint")
+    init_db(s)
+    try:
         yield s
+    finally:
+        s.close()
+        outer.rollback()
+        connection.close()
 
 
 @pytest.fixture

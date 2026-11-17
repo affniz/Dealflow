@@ -13,8 +13,7 @@ if config.config_file_name is not None:
 
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 target_metadata = SQLModel.metadata
-# sqlite can't ALTER most things in place; batch mode rebuilds tables instead
-render_as_batch = settings.DATABASE_URL.startswith("sqlite")
+render_as_batch = False
 
 
 def run_migrations_offline() -> None:

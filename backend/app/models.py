@@ -13,7 +13,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, computed_field, field_validator
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -306,6 +306,9 @@ class Deal(DealBase, table=True):
     lost_note: str | None = None
     closed_at: datetime | None = None
     stage_changed_at: datetime = Field(default_factory=utcnow)
+    # set by the rotting job when an open deal sits in one stage longer than
+    # pipeline.rotting_days; cleared when the deal moves or closes
+    rotting_since: datetime | None = Field(default=None, index=True)
     custom_fields: dict[str, Any] = json_column()
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
@@ -344,9 +347,15 @@ class DealPublic(DealBase):
     lost_note: str | None
     closed_at: datetime | None
     stage_changed_at: datetime
+    rotting_since: datetime | None
     custom_fields: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def is_rotting(self) -> bool:
+        return self.rotting_since is not None
 
 
 class DealEvent(SQLModel, table=True):
@@ -456,3 +465,36 @@ class PipelineSummary(BaseModel):
     won_count: int
     won_value: Decimal
     lost_count: int
+
+
+class BoardColumn(BaseModel):
+    stage: StagePublic
+    deal_count: int
+    total_value: Decimal
+    weighted_value: Decimal
+    rotting_count: int
+    deals: list[DealPublic]  # newest first, capped by deals_per_stage
+
+
+class Board(BaseModel):
+    pipeline_id: int
+    name: str
+    rotting_days: int
+    columns: list[BoardColumn]
+    total_value: Decimal
+    weighted_value: Decimal
+
+
+class LostReasonStat(BaseModel):
+    reason_id: int
+    label: str
+    count: int
+    value: Decimal
+    share: float  # fraction of lost deals, 0..1
+
+
+class LostReasonReport(BaseModel):
+    since: datetime
+    lost_count: int
+    lost_value: Decimal
+    reasons: list[LostReasonStat]  # most common first

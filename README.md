@@ -1,40 +1,59 @@
-# CRM
+# Dealflow
 
-A sales CRM built with FastAPI, following the plan in the "Open-Source CRM Projects on GitHub" doc.
+A sales CRM API built with FastAPI, SQLModel, PostgreSQL, Celery and Redis.
 
-**Phase 1 (done): core backend**
-- Contacts, companies, deals, activities, with search, filters and pagination
-- Pipelines with ordered stages and win probabilities; lost reasons
-- Deals: move between stages, mark won / lost (with a reason) / reopen
-- Deal timeline: change history + activities in one list (`GET /deals/{id}/timeline`)
-- Dashboard: per-stage counts, totals and probability-weighted forecast
+## Features
+
+**Core**
+- Contacts, companies, deals and activities (calls, meetings, tasks, emails, notes), with
+  search, filters and pagination
+- Pipelines with ordered stages and win probabilities; deals move between stages and are
+  marked won, lost (with a reason) or reopened
+- Deal timeline: change history and activities in one list (`GET /deals/{id}/timeline`)
+- Custom fields on contacts, companies and deals (stored as JSON)
 - JWT login and four roles: **owner**, **admin** (all records, settings, users),
   **agent** (only their own records), **viewer** (read-only)
-- Custom fields on contacts, companies and deals (stored as JSON)
-- Alembic migrations (tested on Postgres and sqlite), 22 pytest tests
+
+**Pipeline insight**
+- **Rotting deals**: a Celery job flags open deals that have sat in one stage longer than
+  the pipeline's `rotting_days` (default 14), logs it on the deal's timeline and creates a
+  follow-up task for the owner. Moving or closing the deal clears the flag.
+  Filter with `GET /deals?rotting=true`.
+- **Kanban board** (`GET /pipelines/{id}/board`): one column per stage with its deals,
+  total value, probability-weighted forecast and number of rotting deals
+- **Lost-reason analytics** (`GET /dashboard/lost-reasons?days=90`): count, value and share
+  of lost deals per reason
+- **Pipeline summary** (`GET /dashboard/pipeline/{id}`): open, weighted, won and lost totals
+
+Agents see only their own numbers everywhere; owners, admins and viewers see the whole team.
 
 ## Run it
 
+You need Python 3.11+, [uv](https://docs.astral.sh/uv/) and Docker (for Postgres and Redis).
+
 ```bash
+docker compose up -d          # Postgres (dealflow + dealflow_test databases) and Redis
 cd backend
-uv sync                      # installs dependencies into .venv
-cp .env.example .env         # then set SECRET_KEY
-uv run bash scripts/prestart.sh   # migrate + create the first owner and default pipeline
+uv sync
+cp .env.example .env          # then set SECRET_KEY
+uv run bash scripts/prestart.sh    # migrate + create the first owner and default pipeline
 uv run fastapi dev app/main.py
+```
+
+In a second terminal, start the background worker and its scheduler:
+
+```bash
+cd backend && uv run celery -A app.worker worker --beat --loglevel=info
 ```
 
 Open http://localhost:8000/docs, click **Authorize**, and log in as `owner@example.com` /
 `changethis123` (from `.env`).
 
-To use Postgres instead of sqlite: `docker compose up -d db`, then set
-`DATABASE_URL=postgresql+psycopg://crm:crm@localhost:5432/crm` in `backend/.env` and rerun the
-prestart script.
-
 ## Develop
 
 ```bash
 cd backend
-uv run pytest                 # tests (in-memory sqlite)
+uv run pytest                 # runs against the dealflow_test database
 uv run ruff check . && uv run ruff format .
 uv run alembic revision --autogenerate -m "describe change"   # after editing app/models.py
 ```
@@ -43,20 +62,22 @@ uv run alembic revision --autogenerate -m "describe change"   # after editing ap
 
 ```
 backend/app/
-  models.py          tables + request/response schemas
-  api/access.py      record-level access rules (who sees and edits what)
-  api/deps.py        DB session, current user, role checks
-  api/routes/        one file per resource
-  initial_data.py    first owner, default "Sales" pipeline, lost reasons
-backend/alembic/     migrations
+  models.py            tables + request/response schemas
+  api/access.py        record-level access rules (who sees and edits what)
+  api/deps.py          DB session, current user, role checks
+  api/routes/          one file per resource
+  services/rotting.py  stalled-deal check (run by the worker)
+  services/stats.py    totals and weighted forecasts
+  worker.py            Celery app and schedule
+  initial_data.py      first owner, default "Sales" pipeline, lost reasons
+backend/alembic/       migrations
 backend/tests/
 ```
 
 ## Roadmap
 
-- **Phase 2, standout features:** rotting-deal flags (Celery + Redis job using
-  `stage_changed_at` and `pipeline.rotting_days`), lost-reason analytics endpoint, weighted
-  totals per kanban column
-- **Phase 3, front end:** React kanban board, deal workspace page with the timeline
-- **Phase 4, extras:** CSV import with dedupe, saved views, live board updates over
-  WebSockets, WhatsApp or AI-drafted replies
+- [x] Phase 1: core backend
+- [x] Phase 2: rotting deals, kanban board data, lost-reason analytics
+- [ ] Phase 3: React front end: kanban board, deal workspace with timeline, dashboard charts
+- [ ] Phase 4: CSV import with dedupe, saved views, live board updates over WebSockets,
+      WhatsApp or AI-drafted replies
