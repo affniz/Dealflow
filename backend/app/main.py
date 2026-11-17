@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     activities,
+    board,
     companies,
     contacts,
     dashboard,
@@ -28,7 +29,7 @@ app.add_middleware(
 )
 
 api = APIRouter()
-for module in (login, users, companies, contacts, pipelines, deals, activities, dashboard):
+for module in (login, users, companies, contacts, pipelines, board, deals, activities, dashboard):
     api.include_router(module.router)
 app.include_router(api, prefix=settings.API_V1_STR)
 

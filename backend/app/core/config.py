@@ -9,15 +9,19 @@ DEV_SECRET = "dev-only-insecure-secret-change-me-before-deploying"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
 
-    PROJECT_NAME: str = "CRM"
+    PROJECT_NAME: str = "Dealflow"
     ENVIRONMENT: Literal["local", "production"] = "local"
     API_V1_STR: str = "/api/v1"
 
     SECRET_KEY: str = DEV_SECRET
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
-    # sqlite for quick local dev; use postgresql+psycopg://user:pass@host/db for real use
-    DATABASE_URL: str = "sqlite:///./crm.db"
+    DATABASE_URL: str = "postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow"
+    # used by pytest; tables are created fresh in it, so never point this at real data
+    TEST_DATABASE_URL: str = "postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow_test"
+
+    REDIS_URL: str = "redis://localhost:6379/0"
+    ROTTING_CHECK_INTERVAL_SECONDS: int = 3600
 
     FIRST_OWNER_EMAIL: str = "owner@example.com"
     FIRST_OWNER_PASSWORD: str = "changethis123"

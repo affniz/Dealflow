@@ -58,10 +58,14 @@ def list_deals(
     deal_status: DealStatus | None = Query(None, alias="status"),
     contact_id: int | None = None,
     company_id: int | None = None,
+    rotting: bool | None = Query(None, description="Only rotting (true) or fresh (false) deals"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ) -> Page[DealPublic]:
     stmt = scoped(select(Deal), Deal, user)
+    if rotting is not None:
+        flag = col(Deal.rotting_since)
+        stmt = stmt.where(flag.is_not(None) if rotting else flag.is_(None))
     if q:
         stmt = stmt.where(col(Deal.title).ilike(f"%{q}%"))
     filters = {
@@ -118,6 +122,7 @@ def update_deal(session: SessionDep, user: WriterUser, deal_id: int, body: DealU
         deal.stage_id = stage.id  # type: ignore[assignment]
         deal.pipeline_id = stage.pipeline_id
         deal.stage_changed_at = utcnow()
+        deal.rotting_since = None
         deal.updated_at = utcnow()
 
     changed = apply_update(session, deal, user, data)
@@ -133,6 +138,7 @@ def mark_won(session: SessionDep, user: WriterUser, deal_id: int) -> Deal:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Deal is already {deal.status.value}")
     deal.status = DealStatus.won
     deal.closed_at = deal.updated_at = utcnow()
+    deal.rotting_since = None
     _log(session, deal, user, "won", value=str(deal.value))
     return save(session, deal)
 
@@ -149,6 +155,7 @@ def mark_lost(session: SessionDep, user: WriterUser, deal_id: int, body: DealLos
     deal.lost_reason_id = reason.id
     deal.lost_note = body.note
     deal.closed_at = deal.updated_at = utcnow()
+    deal.rotting_since = None
     _log(session, deal, user, "lost", reason_id=reason.id, reason=reason.label, note=body.note)
     return save(session, deal)
 
@@ -160,7 +167,7 @@ def reopen(session: SessionDep, user: WriterUser, deal_id: int) -> Deal:
         raise HTTPException(status.HTTP_409_CONFLICT, "Deal is already open")
     _log(session, deal, user, "reopened", previous_status=deal.status.value)
     deal.status = DealStatus.open
-    deal.lost_reason_id = deal.lost_note = deal.closed_at = None
+    deal.lost_reason_id = deal.lost_note = deal.closed_at = deal.rotting_since = None
     deal.stage_changed_at = deal.updated_at = utcnow()
     return save(session, deal)
 
