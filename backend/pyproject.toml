@@ -12,6 +12,7 @@ dependencies = [
     "bcrypt>=4.2",
     "psycopg[binary]>=3.2",
     "celery[redis]>=5.4",
+    "anthropic>=2.9.0",
 ]
 
 [dependency-groups]

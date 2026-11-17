@@ -28,6 +28,14 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
     DEFAULT_CURRENCY: str = "INR"
+    # the team's time zone: what "today" and "10am" mean to the AI agents
+    TIMEZONE: str = "Asia/Kolkata"
+
+    # AI agents (Claude Messages API). Without a key, AI features report they're not set up.
+    ANTHROPIC_API_KEY: str | None = None
+    AGENT_MODEL: str = "claude-opus-5-5"
+    AGENT_EFFORT: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    COPILOT_MAX_STEPS: int = 8  # model calls per user message, to bound cost and latency
 
     @model_validator(mode="after")
     def _no_dev_secrets_in_prod(self) -> "Settings":

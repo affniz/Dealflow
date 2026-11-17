@@ -7,6 +7,7 @@ from app.api.routes import (
     board,
     companies,
     contacts,
+    copilot,
     dashboard,
     deals,
     login,
@@ -37,7 +38,18 @@ app.add_middleware(
 )
 
 api = APIRouter()
-for module in (login, users, companies, contacts, pipelines, board, deals, activities, dashboard):
+for module in (
+    login,
+    users,
+    companies,
+    contacts,
+    pipelines,
+    board,
+    deals,
+    activities,
+    dashboard,
+    copilot,
+):
     api.include_router(module.router)
 app.include_router(api, prefix=settings.API_V1_STR)
 

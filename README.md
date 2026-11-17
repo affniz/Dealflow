@@ -1,7 +1,8 @@
 # Dealflow
 
-A sales CRM: a FastAPI + PostgreSQL backend with Celery/Redis background jobs, and a React
-front end. AI agents that work the pipeline alongside the team are on the way (see Roadmap).
+An agentic CRM for B2B sales teams: a FastAPI + PostgreSQL backend with Celery/Redis background
+jobs, a React front end, and a Claude-powered Copilot that looks things up and prepares changes,
+with a person approving every change.
 
 ## Features
 
@@ -37,6 +38,36 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - Sign-in and role-aware screens: viewers get no edit controls, agents see only their own deals;
   works on phones and follows the system light/dark setting
 
+**Copilot (AI)**
+- A chat panel on every page. Ask "what's stalled and what should I do?" or "log a call with
+  Priya and move it to Proposal"; it knows which deal you're looking at
+- It reads with your access (agents' Copilot sees only their deals) and **proposes** changes as
+  cards you approve or reject, in the chat or on the deal page; approved changes show
+  "via Copilot" on the timeline
+- Viewers can ask questions but can't change anything
+
+### How the Copilot works
+
+- **Loop** (`app/agent/copilot.py`): a tool-use loop on the Claude Messages API, run in the
+  backend. Each user message runs up to `COPILOT_MAX_STEPS` model calls: Claude asks for tools,
+  Dealflow runs them and sends back the results, until Claude answers.
+- **Tools** (`app/agent/tools.py`): six read tools (search deals, read a deal and its history,
+  contacts, activities, pipeline overview, lost-deal report) and six change tools. Each tool's
+  input is a Pydantic model, sent as a `strict` schema and re-validated before it runs.
+- **Human approval**: change tools never change anything. They create an `AgentProposal`; when
+  a person approves it, it runs through the same action layer as the REST API
+  (`app/services/actions.py`), with the approver's access checked at that moment. If the deal
+  changed meanwhile (say it was closed), the proposal is marked failed with the reason.
+- **Access**: tools run as the signed-in user, so the Copilot can't see or touch what the user
+  couldn't. Text inside CRM records is treated as data, never as instructions.
+- **History**: conversations are stored exactly as sent to the API and only appended to; the
+  model's thinking blocks are only valid in an unedited history. The system prompt and tool
+  list never change, and per-turn facts (current time, the user, the deal on screen) go in a
+  system message after the user's message, so prompt caching keeps working.
+- **Safety nets**: a step limit per message, server-side model fallback if a safety classifier
+  declines, and a polite reply on refusal.
+- **Tests** (`tests/test_copilot.py`) use a scripted stand-in for Claude: no network or API key.
+
 ## Run it
 
 You need Python 3.11+, [uv](https://docs.astral.sh/uv/) and Docker (for Postgres and Redis).
@@ -71,6 +102,9 @@ npm install
 npm run dev
 ```
 
+To turn on the Copilot, put an Anthropic API key in `backend/.env` (`ANTHROPIC_API_KEY=...`)
+and restart the API. Everything else works without it.
+
 Open http://localhost:5173 and sign in as `owner@example.com` / `changethis123` (from `.env`) or a
 demo user. The API's interactive docs are at http://localhost:8000/docs.
 
@@ -99,6 +133,8 @@ backend/app/
   api/access.py        record-level access rules (who sees and edits what)
   api/deps.py          DB session, current user, role checks
   api/routes/          one file per resource
+  agent/               Copilot: tool-use loop, tools, proposal approval
+  services/actions.py  every change to deals and activities (used by the API and the agents)
   services/rotting.py  stalled-deal check (run by the worker)
   services/stats.py    totals and weighted forecasts
   worker.py            Celery app and schedule
@@ -120,7 +156,7 @@ frontend/src/
 - [ ] Phase 3: React front end and AI agents
   - [x] 3a: front-end skeleton, sign-in, generated API client, read-only board
   - [x] 3b: drag-and-drop board, deal page with timeline
-  - [ ] 3c: agent foundation: shared action layer, Copilot chat with approval of every change
+  - [x] 3c: agent foundation: shared action layer, Copilot chat with approval of every change
   - [ ] 3d: pipeline agent that reviews stalled deals nightly, and an agent inbox
   - [ ] 3e: contacts, companies, my activities
   - [ ] 3f: dashboard charts, admin settings
