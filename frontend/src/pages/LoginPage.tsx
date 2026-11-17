@@ -36,7 +36,9 @@ export function LoginPage() {
     <div className="grid min-h-full place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2 text-2xl font-semibold tracking-tight">
-          <span className="grid size-9 place-items-center rounded-lg bg-brand-600 text-white">D</span>
+          <span className="grid size-9 place-items-center rounded-lg bg-brand-600 text-white">
+            D
+          </span>
           Dealflow
         </div>
         <Card className="p-6">

@@ -150,3 +150,24 @@ def test_lost_reason_report(client, login, session, stages):
     # agents only see their own losses
     mine = client.get(f"{API}/dashboard/lost-reasons", headers=alice).json()
     assert mine["lost_count"] == 2 and [x["label"] for x in mine["reasons"]] == ["Price"]
+
+
+def test_board_filters_apply_to_deals_and_totals(client, login, session, stages):
+    admin, alice, bob = login(Role.admin), login(Role.agent), login(Role.agent)
+    alice_id = client.get(f"{API}/users/me", headers=alice).json()["id"]
+    _deal(client, alice, stages[0], value=1000)
+    stale = _deal(client, alice, stages[0], value=2000)
+    _deal(client, bob, stages[0], value=4000)
+    _age(session, stale["id"], 20)
+    check_rotting(session)
+    url = f"{API}/pipelines/{_pipeline_id(client, admin)}/board"
+
+    mine = client.get(url, headers=admin, params={"owner_id": alice_id}).json()["columns"][0]
+    assert mine["deal_count"] == 2 and mine["total_value"] == "3000.00"
+    stalled = client.get(url, headers=admin, params={"rotting": True}).json()["columns"][0]
+    assert [d["title"] for d in stalled["deals"]] == ["Deal"] and stalled[
+        "total_value"
+    ] == "2000.00"
+    # an agent filtering by someone else's id still only sees their own (empty) slice
+    bob_view = client.get(url, headers=bob, params={"owner_id": alice_id}).json()["columns"][0]
+    assert bob_view["deal_count"] == 0
