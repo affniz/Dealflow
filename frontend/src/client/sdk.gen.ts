@@ -764,6 +764,7 @@ export const pipelinesUpdateLostReason = <ThrowOnError extends boolean = false>(
  * Kanban view: one column per stage with its open deals, totals and weighted forecast.
  *
  * Column totals cover every open deal in the stage, even when the deal list is capped.
+ * Filters apply to both the deals and the totals.
  */
 export const boardPipelineBoard = <ThrowOnError extends boolean = false>(
   options: Options<BoardPipelineBoardData, ThrowOnError>,

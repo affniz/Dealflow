@@ -29,8 +29,13 @@ front end. AI agents that work the pipeline alongside the team are on the way (s
 Agents see only their own numbers everywhere; owners, admins and viewers see the whole team.
 
 **Front end** (React, in progress)
-- Sign in, role-aware navigation, and a pipeline board showing each stage's deals, totals,
-  forecast and stalled deals; works on phones and follows the system light/dark setting
+- **Pipeline board**: drag deals between stages (the move shows instantly and is undone if the
+  server refuses it); each column shows its count, total, weighted forecast and stalled deals;
+  "My deals" and "Stalled only" filters; add a deal from the board
+- **Deal page**: clickable stage bar; Won, Lost (with a reason), Reopen, Edit and Delete; the
+  deal's timeline of changes and activities; log a note, call or meeting, or schedule a task
+- Sign-in and role-aware screens: viewers get no edit controls, agents see only their own deals;
+  works on phones and follows the system light/dark setting
 
 ## Run it
 
@@ -81,6 +86,7 @@ uv run alembic revision --autogenerate -m "describe change"   # after editing ap
 ```bash
 cd frontend
 npm run build && npm run lint
+npm run format                # Prettier
 # after changing the API, regenerate the typed client in src/client:
 (cd ../backend && uv run python scripts/export_openapi.py) && npm run generate-client
 ```
@@ -113,7 +119,7 @@ frontend/src/
 - [x] Phase 2: rotting deals, kanban board data, lost-reason analytics
 - [ ] Phase 3: React front end and AI agents
   - [x] 3a: front-end skeleton, sign-in, generated API client, read-only board
-  - [ ] 3b: drag-and-drop board, deal page with timeline
+  - [x] 3b: drag-and-drop board, deal page with timeline
   - [ ] 3c: agent foundation: shared action layer, Copilot chat with approval of every change
   - [ ] 3d: pipeline agent that reviews stalled deals nightly, and an agent inbox
   - [ ] 3e: contacts, companies, my activities

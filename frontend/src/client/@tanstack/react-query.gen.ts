@@ -1005,6 +1005,7 @@ export const boardPipelineBoardQueryKey = (
  * Kanban view: one column per stage with its open deals, totals and weighted forecast.
  *
  * Column totals cover every open deal in the stage, even when the deal list is capped.
+ * Filters apply to both the deals and the totals.
  */
 export const boardPipelineBoardOptions = (
   options: Options<BoardPipelineBoardData>,

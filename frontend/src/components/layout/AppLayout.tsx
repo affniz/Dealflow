@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react"
 import { useState } from "react"
-import { NavLink, Outlet } from "react-router-dom"
+import { NavLink, Outlet, useLocation } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/card"
@@ -19,7 +19,7 @@ import { permissions, useAuth } from "@/lib/auth"
 import { cn, initials } from "@/lib/utils"
 
 const NAV = [
-  { to: "/", label: "Pipeline", icon: SquareKanban, end: true },
+  { to: "/", label: "Pipeline", icon: SquareKanban, end: true, alsoActive: "/deals/" },
   { to: "/contacts", label: "Contacts", icon: Users },
   { to: "/companies", label: "Companies", icon: Building2 },
   { to: "/activities", label: "My activities", icon: ListChecks },
@@ -31,6 +31,7 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const { isAdmin } = permissions(user)
   const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
   const name = user?.full_name || user?.email || ""
   const nav = isAdmin ? [...NAV, { to: "/settings", label: "Settings", icon: Settings }] : NAV
 
@@ -42,7 +43,7 @@ export function AppLayout() {
         </span>
         Dealflow
       </div>
-      {nav.map(({ to, label, icon: Icon, end }) => (
+      {nav.map(({ to, label, icon: Icon, end, alsoActive }) => (
         <NavLink
           key={to}
           to={to}
@@ -51,7 +52,9 @@ export function AppLayout() {
           className={({ isActive }) =>
             cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              isActive ? "bg-brand-50 text-brand-700" : "text-ink-soft hover:bg-muted hover:text-ink",
+              isActive || (alsoActive && pathname.startsWith(alsoActive))
+                ? "bg-brand-50 text-brand-700"
+                : "text-ink-soft hover:bg-muted hover:text-ink",
             )
           }
         >
@@ -76,7 +79,9 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full">
-      <aside className="hidden w-60 shrink-0 border-r border-line bg-surface md:block">{sidebar}</aside>
+      <aside className="hidden w-60 shrink-0 border-r border-line bg-surface md:block">
+        {sidebar}
+      </aside>
 
       {open && (
         <div className="fixed inset-0 z-40 md:hidden">

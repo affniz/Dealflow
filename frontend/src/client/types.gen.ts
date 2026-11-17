@@ -2282,6 +2282,18 @@ export type BoardPipelineBoardData = {
      * Deals Per Stage
      */
     deals_per_stage?: number;
+    /**
+     * Owner Id
+     *
+     * Only deals owned by this user
+     */
+    owner_id?: number | null;
+    /**
+     * Rotting
+     *
+     * Only stalled (true) or fresh (false) deals
+     */
+    rotting?: boolean | null;
   };
   url: "/api/v1/pipelines/{pipeline_id}/board";
 };

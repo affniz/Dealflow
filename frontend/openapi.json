@@ -1387,7 +1387,7 @@
           "board"
         ],
         "summary": "Pipeline Board",
-        "description": "Kanban view: one column per stage with its open deals, totals and weighted forecast.\n\nColumn totals cover every open deal in the stage, even when the deal list is capped.",
+        "description": "Kanban view: one column per stage with its open deals, totals and weighted forecast.\n\nColumn totals cover every open deal in the stage, even when the deal list is capped.\nFilters apply to both the deals and the totals.",
         "operationId": "board-pipeline_board",
         "security": [
           {
@@ -1415,6 +1415,42 @@
               "default": 50,
               "title": "Deals Per Stage"
             }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only deals owned by this user",
+              "title": "Owner Id"
+            },
+            "description": "Only deals owned by this user"
+          },
+          {
+            "name": "rotting",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only stalled (true) or fresh (false) deals",
+              "title": "Rotting"
+            },
+            "description": "Only stalled (true) or fresh (false) deals"
           }
         ],
         "responses": {
