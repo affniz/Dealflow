@@ -101,3 +101,37 @@ def test_dashboard_rounds_half_up(client, login, stages):
     pipeline_id = client.get(f"{API}/pipelines", headers=h).json()[0]["id"]
     s = client.get(f"{API}/dashboard/pipeline/{pipeline_id}", headers=h).json()
     assert s["weighted_value"] == "62500.13"
+
+
+def test_deal_responses_include_names(client, login, stages):
+    h = login(Role.agent, email="ravi@example.com")
+    client.patch(f"{API}/users/me", headers=h, json={"full_name": "Ravi Kumar"})
+    co = client.post(f"{API}/companies", headers=h, json={"name": "Infosys"}).json()
+    c = client.post(
+        f"{API}/contacts", headers=h, json={"first_name": "Priya", "last_name": "Shah"}
+    ).json()
+    body = {
+        "title": "Renewal",
+        "stage_id": stages[0],
+        "company_id": co["id"],
+        "contact_id": c["id"],
+    }
+    d = client.post(f"{API}/deals", headers=h, json=body).json()
+    assert d["owner"]["name"] == "Ravi Kumar"
+    assert d["company"] == {"id": co["id"], "name": "Infosys"}
+    assert d["contact"]["name"] == "Priya Shah"
+
+    listed = client.get(f"{API}/deals", headers=h).json()["data"][0]
+    assert listed["company"]["name"] == "Infosys"
+    board = client.get(f"{API}/pipelines/{d['pipeline_id']}/board", headers=h).json()
+    assert board["columns"][0]["deals"][0]["contact"]["name"] == "Priya Shah"
+
+    timeline = client.get(f"{API}/deals/{d['id']}/timeline", headers=h).json()
+    assert timeline[0]["actor"]["name"] == "Ravi Kumar"
+
+
+def test_user_directory_is_readable_by_everyone(client, login):
+    viewer = login(Role.viewer)
+    entries = client.get(f"{API}/users/directory", headers=viewer).json()
+    assert {"owner", "viewer"} <= {e["role"] for e in entries}
+    assert all(set(e) == {"id", "name", "role"} for e in entries)  # no emails or flags leak

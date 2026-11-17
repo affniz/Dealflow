@@ -4,6 +4,7 @@ from sqlmodel import col, select
 from app.api.access import scoped
 from app.api.deps import CurrentUser, SessionDep
 from app.models import Board, BoardColumn, Deal, DealPublic, DealStatus, Pipeline, StagePublic
+from app.services.names import with_deal_names
 from app.services.stats import StageTotals, money, open_totals_by_stage, weighted
 
 router = APIRouter(tags=["board"])
@@ -43,7 +44,7 @@ def pipeline_board(
                 total_value=t.total,
                 weighted_value=weighted(t.total, stage.probability),
                 rotting_count=t.rotting,
-                deals=[DealPublic.model_validate(d) for d in deals],
+                deals=with_deal_names(session, [DealPublic.model_validate(d) for d in deals]),
             )
         )
 

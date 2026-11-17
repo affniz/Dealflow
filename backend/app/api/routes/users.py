@@ -11,10 +11,12 @@ from app.models import (
     Role,
     User,
     UserCreate,
+    UserDirectoryEntry,
     UserPublic,
     UserUpdate,
     UserUpdateMe,
 )
+from app.services.names import user_name
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -37,6 +39,13 @@ def change_password(session: SessionDep, user: CurrentUser, body: PasswordChange
     user.hashed_password = hash_password(body.new_password)
     save(session, user)
     return Message(message="Password updated")
+
+
+@router.get("/directory", response_model=list[UserDirectoryEntry])
+def user_directory(session: SessionDep, _: CurrentUser) -> list[UserDirectoryEntry]:
+    """Active users' names and roles, for owner pickers and showing who did what."""
+    users = session.exec(select(User).where(col(User.is_active).is_(True)).order_by(col(User.id)))
+    return [UserDirectoryEntry(id=u.id, name=user_name(u), role=u.role) for u in users]  # type: ignore[arg-type]
 
 
 @router.get("", response_model=Page[UserPublic])

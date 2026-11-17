@@ -1,6 +1,7 @@
 # Dealflow
 
-A sales CRM API built with FastAPI, SQLModel, PostgreSQL, Celery and Redis.
+A sales CRM: a FastAPI + PostgreSQL backend with Celery/Redis background jobs, and a React
+front end. AI agents that work the pipeline alongside the team are on the way (see Roadmap).
 
 ## Features
 
@@ -27,6 +28,10 @@ A sales CRM API built with FastAPI, SQLModel, PostgreSQL, Celery and Redis.
 
 Agents see only their own numbers everywhere; owners, admins and viewers see the whole team.
 
+**Front end** (React, in progress)
+- Sign in, role-aware navigation, and a pipeline board showing each stage's deals, totals,
+  forecast and stalled deals; works on phones and follows the system light/dark setting
+
 ## Run it
 
 You need Python 3.11+, [uv](https://docs.astral.sh/uv/) and Docker (for Postgres and Redis).
@@ -46,8 +51,23 @@ In a second terminal, start the background worker and its scheduler:
 cd backend && uv run celery -A app.worker worker --beat --loglevel=info
 ```
 
-Open http://localhost:8000/docs, click **Authorize**, and log in as `owner@example.com` /
-`changethis123` (from `.env`).
+Optionally load a demo sales team and pipeline (users `meera@`, `arjun@`, `sana@` and
+`vikram@dealflow.dev`, password `demo-password`):
+
+```bash
+cd backend && uv run python -m app.demo_data
+```
+
+Then start the front end in a third terminal (needs Node 20+):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 and sign in as `owner@example.com` / `changethis123` (from `.env`) or a
+demo user. The API's interactive docs are at http://localhost:8000/docs.
 
 ## Develop
 
@@ -56,6 +76,13 @@ cd backend
 uv run pytest                 # runs against the dealflow_test database
 uv run ruff check . && uv run ruff format .
 uv run alembic revision --autogenerate -m "describe change"   # after editing app/models.py
+```
+
+```bash
+cd frontend
+npm run build && npm run lint
+# after changing the API, regenerate the typed client in src/client:
+(cd ../backend && uv run python scripts/export_openapi.py) && npm run generate-client
 ```
 
 ## Layout
@@ -70,14 +97,27 @@ backend/app/
   services/stats.py    totals and weighted forecasts
   worker.py            Celery app and schedule
   initial_data.py      first owner, default "Sales" pipeline, lost reasons
+  demo_data.py         demo sales team, companies, contacts and deals
 backend/alembic/       migrations
 backend/tests/
+frontend/src/
+  client/              generated API client and React Query hooks (don't edit by hand)
+  lib/auth.ts          sign-in token, current user, role permissions
+  components/          layout, route guards, UI building blocks
+  pages/               one file per screen
 ```
 
 ## Roadmap
 
 - [x] Phase 1: core backend
 - [x] Phase 2: rotting deals, kanban board data, lost-reason analytics
-- [ ] Phase 3: React front end: kanban board, deal workspace with timeline, dashboard charts
+- [ ] Phase 3: React front end and AI agents
+  - [x] 3a: front-end skeleton, sign-in, generated API client, read-only board
+  - [ ] 3b: drag-and-drop board, deal page with timeline
+  - [ ] 3c: agent foundation: shared action layer, Copilot chat with approval of every change
+  - [ ] 3d: pipeline agent that reviews stalled deals nightly, and an agent inbox
+  - [ ] 3e: contacts, companies, my activities
+  - [ ] 3f: dashboard charts, admin settings
+  - [ ] 3g: end-to-end tests and CI; MCP server so Claude can work with Dealflow directly
 - [ ] Phase 4: CSV import with dedupe, saved views, live board updates over WebSockets,
-      WhatsApp or AI-drafted replies
+      WhatsApp messaging
