@@ -1,0 +1,458 @@
+"""Database tables and API schemas.
+
+Each resource follows the same pattern:
+  XBase    shared fields
+  X        the table (table=True)
+  XCreate  request body for POST
+  XUpdate  request body for PATCH (every field optional; required columns reject null)
+  XPublic  response body
+"""
+
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from enum import StrEnum
+from typing import Any, Generic, Literal, TypeVar
+
+from pydantic import BaseModel, EmailStr, field_validator
+from sqlalchemy import JSON, Column
+from sqlmodel import Field, Relationship, SQLModel
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def to_utc(value: datetime | None) -> datetime | None:
+    """Treat timestamps sent without a timezone as UTC; store everything in UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def json_column() -> Any:
+    return Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+
+
+T = TypeVar("T")
+
+
+class Page(BaseModel, Generic[T]):
+    data: list[T]
+    count: int
+
+
+class Message(BaseModel):
+    message: str
+
+
+# ---------------------------------------------------------------- enums
+
+
+class Role(StrEnum):
+    owner = "owner"  # everything, including managing admins
+    admin = "admin"  # all records, settings, users
+    agent = "agent"  # only their own records
+    viewer = "viewer"  # read-only, all records
+
+
+class DealStatus(StrEnum):
+    open = "open"
+    won = "won"
+    lost = "lost"
+
+
+class ActivityType(StrEnum):
+    call = "call"
+    meeting = "meeting"
+    task = "task"
+    email = "email"
+    note = "note"
+
+
+# ---------------------------------------------------------------- users
+
+
+class UserBase(SQLModel):
+    email: EmailStr = Field(unique=True, index=True, max_length=255)
+    full_name: str | None = Field(default=None, max_length=255)
+    role: Role = Role.agent
+    is_active: bool = True
+
+
+class User(UserBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    hashed_password: str
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class UserCreate(UserBase):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class UserUpdate(SQLModel):
+    email: EmailStr = Field(default=None, max_length=255)
+    full_name: str | None = Field(default=None, max_length=255)
+    role: Role = None
+    is_active: bool = None
+    password: str = Field(default=None, min_length=8, max_length=128)
+
+
+class UserUpdateMe(SQLModel):
+    full_name: str | None = Field(default=None, max_length=255)
+
+
+class PasswordChange(SQLModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class UserPublic(UserBase):
+    id: int
+    created_at: datetime
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+# ---------------------------------------------------------------- companies
+
+
+class CompanyBase(SQLModel):
+    name: str = Field(min_length=1, max_length=255, index=True)
+    domain: str | None = Field(default=None, max_length=255)
+    industry: str | None = Field(default=None, max_length=100)
+    phone: str | None = Field(default=None, max_length=50)
+
+
+class Company(CompanyBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    custom_fields: dict[str, Any] = json_column()
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class CompanyCreate(CompanyBase):
+    owner_id: int | None = None
+    custom_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class CompanyUpdate(SQLModel):
+    name: str = Field(default=None, min_length=1, max_length=255)
+    domain: str | None = Field(default=None, max_length=255)
+    industry: str | None = Field(default=None, max_length=100)
+    phone: str | None = Field(default=None, max_length=50)
+    owner_id: int = None
+    custom_fields: dict[str, Any] = None
+
+
+class CompanyPublic(CompanyBase):
+    id: int
+    owner_id: int
+    custom_fields: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------- contacts
+
+
+class ContactBase(SQLModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    email: EmailStr | None = Field(default=None, max_length=255, index=True)
+    phone: str | None = Field(default=None, max_length=50)
+    job_title: str | None = Field(default=None, max_length=100)
+    company_id: int | None = Field(default=None, foreign_key="company.id", index=True)
+
+
+class Contact(ContactBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    custom_fields: dict[str, Any] = json_column()
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class ContactCreate(ContactBase):
+    owner_id: int | None = None
+    custom_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class ContactUpdate(SQLModel):
+    first_name: str = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    email: EmailStr | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    job_title: str | None = Field(default=None, max_length=100)
+    company_id: int | None = None
+    owner_id: int = None
+    custom_fields: dict[str, Any] = None
+
+
+class ContactPublic(ContactBase):
+    id: int
+    owner_id: int
+    custom_fields: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------- pipelines
+
+
+class StageBase(SQLModel):
+    name: str = Field(min_length=1, max_length=100)
+    position: int = Field(default=0, ge=0)
+    probability: int = Field(default=0, ge=0, le=100, description="Win chance, percent")
+
+
+class Stage(StageBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    pipeline_id: int = Field(foreign_key="pipeline.id", index=True)
+    pipeline: "Pipeline" = Relationship(back_populates="stages")
+
+
+class StageCreate(StageBase):
+    pass
+
+
+class StageUpdate(SQLModel):
+    name: str = Field(default=None, min_length=1, max_length=100)
+    position: int = Field(default=None, ge=0)
+    probability: int = Field(default=None, ge=0, le=100)
+
+
+class StagePublic(StageBase):
+    id: int
+    pipeline_id: int
+
+
+class PipelineBase(SQLModel):
+    name: str = Field(min_length=1, max_length=100, unique=True)
+    rotting_days: int = Field(
+        default=14, ge=1, description="Days without a stage change before a deal is rotting"
+    )
+
+
+class Pipeline(PipelineBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    stages: list[Stage] = Relationship(
+        back_populates="pipeline", sa_relationship_kwargs={"order_by": "Stage.position"}
+    )
+
+
+class PipelineCreate(PipelineBase):
+    stages: list[StageCreate] = Field(default_factory=list)
+
+
+class PipelineUpdate(SQLModel):
+    name: str = Field(default=None, min_length=1, max_length=100)
+    rotting_days: int = Field(default=None, ge=1)
+
+
+class PipelinePublic(PipelineBase):
+    id: int
+    created_at: datetime
+    stages: list[StagePublic]
+
+
+class LostReasonBase(SQLModel):
+    label: str = Field(min_length=1, max_length=100, unique=True)
+    is_active: bool = True
+
+
+class LostReason(LostReasonBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+
+
+class LostReasonCreate(LostReasonBase):
+    pass
+
+
+class LostReasonUpdate(SQLModel):
+    label: str = Field(default=None, min_length=1, max_length=100)
+    is_active: bool = None
+
+
+class LostReasonPublic(LostReasonBase):
+    id: int
+
+
+# ---------------------------------------------------------------- deals
+
+
+class DealBase(SQLModel):
+    title: str = Field(min_length=1, max_length=255)
+    value: Decimal = Field(default=Decimal("0"), ge=0, max_digits=14, decimal_places=2)
+    currency: str = Field(default="INR", min_length=3, max_length=3)
+    expected_close_date: date | None = None
+    contact_id: int | None = Field(default=None, foreign_key="contact.id", index=True)
+    company_id: int | None = Field(default=None, foreign_key="company.id", index=True)
+
+
+class Deal(DealBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    pipeline_id: int = Field(foreign_key="pipeline.id", index=True)
+    stage_id: int = Field(foreign_key="stage.id", index=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    status: DealStatus = Field(default=DealStatus.open, index=True)
+    lost_reason_id: int | None = Field(default=None, foreign_key="lostreason.id")
+    lost_note: str | None = None
+    closed_at: datetime | None = None
+    stage_changed_at: datetime = Field(default_factory=utcnow)
+    custom_fields: dict[str, Any] = json_column()
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class DealCreate(DealBase):
+    stage_id: int
+    owner_id: int | None = None
+    custom_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class DealUpdate(SQLModel):
+    title: str = Field(default=None, min_length=1, max_length=255)
+    value: Decimal = Field(default=None, ge=0, max_digits=14, decimal_places=2)
+    currency: str = Field(default=None, min_length=3, max_length=3)
+    expected_close_date: date | None = None
+    contact_id: int | None = None
+    company_id: int | None = None
+    stage_id: int = None
+    owner_id: int = None
+    custom_fields: dict[str, Any] = None
+
+
+class DealLost(SQLModel):
+    lost_reason_id: int
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class DealPublic(DealBase):
+    id: int
+    pipeline_id: int
+    stage_id: int
+    owner_id: int
+    status: DealStatus
+    lost_reason_id: int | None
+    lost_note: str | None
+    closed_at: datetime | None
+    stage_changed_at: datetime
+    custom_fields: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class DealEvent(SQLModel, table=True):
+    """Change history for a deal; feeds the deal timeline."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    deal_id: int = Field(foreign_key="deal.id", index=True)
+    actor_id: int | None = Field(default=None, foreign_key="user.id")
+    kind: str = Field(max_length=30)  # created, updated, stage_changed, won, lost, reopened
+    data: dict[str, Any] = json_column()
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class DealEventPublic(SQLModel):
+    id: int
+    deal_id: int
+    actor_id: int | None
+    kind: str
+    data: dict[str, Any]
+    created_at: datetime
+
+
+# ---------------------------------------------------------------- activities
+
+
+class ActivityBase(SQLModel):
+    type: ActivityType
+    subject: str = Field(min_length=1, max_length=255)
+    body: str | None = None
+    due_at: datetime | None = None
+    deal_id: int | None = Field(default=None, foreign_key="deal.id", index=True)
+    contact_id: int | None = Field(default=None, foreign_key="contact.id", index=True)
+    company_id: int | None = Field(default=None, foreign_key="company.id", index=True)
+
+    @field_validator("due_at")
+    @classmethod
+    def _utc(cls, v: datetime | None) -> datetime | None:
+        return to_utc(v)
+
+
+class Activity(ActivityBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    done: bool = False
+    done_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class ActivityCreate(ActivityBase):
+    owner_id: int | None = None
+    done: bool = False
+
+
+class ActivityUpdate(SQLModel):
+    type: ActivityType = None
+    subject: str = Field(default=None, min_length=1, max_length=255)
+    body: str | None = None
+    due_at: datetime | None = None
+    deal_id: int | None = None
+    contact_id: int | None = None
+    company_id: int | None = None
+    owner_id: int = None
+    done: bool = None
+
+    @field_validator("due_at")
+    @classmethod
+    def _utc(cls, v: datetime | None) -> datetime | None:
+        return to_utc(v)
+
+
+class ActivityPublic(ActivityBase):
+    id: int
+    owner_id: int
+    done: bool
+    done_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------- timeline & dashboard
+
+
+class TimelineItem(BaseModel):
+    kind: Literal["event", "activity"]
+    at: datetime
+    event: DealEventPublic | None = None
+    activity: ActivityPublic | None = None
+
+
+class StageSummary(BaseModel):
+    stage_id: int
+    name: str
+    probability: int
+    deal_count: int
+    total_value: Decimal
+    weighted_value: Decimal
+
+
+class PipelineSummary(BaseModel):
+    pipeline_id: int
+    name: str
+    stages: list[StageSummary]
+    open_count: int
+    open_value: Decimal
+    weighted_value: Decimal
+    won_count: int
+    won_value: Decimal
+    lost_count: int
