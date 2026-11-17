@@ -33,6 +33,7 @@ from app.models import (
     User,
     utcnow,
 )
+from app.services.names import deal_public, user_refs, with_deal_names
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
@@ -79,11 +80,13 @@ def list_deals(
         if value is not None:
             stmt = stmt.where(column == value)
     stmt = stmt.order_by(col(Deal.created_at).desc(), col(Deal.id).desc())
-    return paginate(session, stmt, DealPublic, skip, limit)
+    page = paginate(session, stmt, DealPublic, skip, limit)
+    with_deal_names(session, page.data)
+    return page
 
 
 @router.post("", response_model=DealPublic, status_code=status.HTTP_201_CREATED)
-def create_deal(session: SessionDep, user: WriterUser, body: DealCreate) -> Deal:
+def create_deal(session: SessionDep, user: WriterUser, body: DealCreate) -> DealPublic:
     stage = _stage_or_422(session, body.stage_id)
     check_ref(session, Contact, body.contact_id, user)
     check_ref(session, Company, body.company_id, user)
@@ -94,16 +97,18 @@ def create_deal(session: SessionDep, user: WriterUser, body: DealCreate) -> Deal
     session.add(deal)
     session.flush()
     _log(session, deal, user, "created", stage_id=stage.id, value=str(deal.value))
-    return save(session, deal)
+    return deal_public(session, save(session, deal))
 
 
 @router.get("/{deal_id}", response_model=DealPublic)
-def read_deal(session: SessionDep, user: CurrentUser, deal_id: int) -> Deal:
-    return get_visible(session, Deal, deal_id, user)
+def read_deal(session: SessionDep, user: CurrentUser, deal_id: int) -> DealPublic:
+    return deal_public(session, get_visible(session, Deal, deal_id, user))
 
 
 @router.patch("/{deal_id}", response_model=DealPublic)
-def update_deal(session: SessionDep, user: WriterUser, deal_id: int, body: DealUpdate) -> Deal:
+def update_deal(
+    session: SessionDep, user: WriterUser, deal_id: int, body: DealUpdate
+) -> DealPublic:
     deal = get_visible(session, Deal, deal_id, user)
     data = body.model_dump(exclude_unset=True)
     if "contact_id" in data:
@@ -128,11 +133,11 @@ def update_deal(session: SessionDep, user: WriterUser, deal_id: int, body: DealU
     changed = apply_update(session, deal, user, data)
     if changed:
         _log(session, deal, user, "updated", fields=changed)
-    return save(session, deal)
+    return deal_public(session, save(session, deal))
 
 
 @router.post("/{deal_id}/won", response_model=DealPublic)
-def mark_won(session: SessionDep, user: WriterUser, deal_id: int) -> Deal:
+def mark_won(session: SessionDep, user: WriterUser, deal_id: int) -> DealPublic:
     deal = get_visible(session, Deal, deal_id, user)
     if deal.status != DealStatus.open:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Deal is already {deal.status.value}")
@@ -140,11 +145,11 @@ def mark_won(session: SessionDep, user: WriterUser, deal_id: int) -> Deal:
     deal.closed_at = deal.updated_at = utcnow()
     deal.rotting_since = None
     _log(session, deal, user, "won", value=str(deal.value))
-    return save(session, deal)
+    return deal_public(session, save(session, deal))
 
 
 @router.post("/{deal_id}/lost", response_model=DealPublic)
-def mark_lost(session: SessionDep, user: WriterUser, deal_id: int, body: DealLost) -> Deal:
+def mark_lost(session: SessionDep, user: WriterUser, deal_id: int, body: DealLost) -> DealPublic:
     deal = get_visible(session, Deal, deal_id, user)
     if deal.status != DealStatus.open:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Deal is already {deal.status.value}")
@@ -157,11 +162,11 @@ def mark_lost(session: SessionDep, user: WriterUser, deal_id: int, body: DealLos
     deal.closed_at = deal.updated_at = utcnow()
     deal.rotting_since = None
     _log(session, deal, user, "lost", reason_id=reason.id, reason=reason.label, note=body.note)
-    return save(session, deal)
+    return deal_public(session, save(session, deal))
 
 
 @router.post("/{deal_id}/reopen", response_model=DealPublic)
-def reopen(session: SessionDep, user: WriterUser, deal_id: int) -> Deal:
+def reopen(session: SessionDep, user: WriterUser, deal_id: int) -> DealPublic:
     deal = get_visible(session, Deal, deal_id, user)
     if deal.status == DealStatus.open:
         raise HTTPException(status.HTTP_409_CONFLICT, "Deal is already open")
@@ -169,7 +174,7 @@ def reopen(session: SessionDep, user: WriterUser, deal_id: int) -> Deal:
     deal.status = DealStatus.open
     deal.lost_reason_id = deal.lost_note = deal.closed_at = deal.rotting_since = None
     deal.stage_changed_at = deal.updated_at = utcnow()
-    return save(session, deal)
+    return deal_public(session, save(session, deal))
 
 
 @router.delete("/{deal_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -191,11 +196,22 @@ def deal_timeline(session: SessionDep, user: CurrentUser, deal_id: int) -> list[
     get_visible(session, Deal, deal_id, user)
     events = session.exec(select(DealEvent).where(DealEvent.deal_id == deal_id)).all()
     activities = session.exec(select(Activity).where(Activity.deal_id == deal_id)).all()
+    names = user_refs(session, [e.actor_id for e in events] + [a.owner_id for a in activities])
     items = [
-        TimelineItem(kind="event", at=e.created_at, event=DealEventPublic.model_validate(e))
+        TimelineItem(
+            kind="event",
+            at=e.created_at,
+            event=DealEventPublic.model_validate(e),
+            actor=names.get(e.actor_id) if e.actor_id else None,
+        )
         for e in events
     ] + [
-        TimelineItem(kind="activity", at=a.created_at, activity=ActivityPublic.model_validate(a))
+        TimelineItem(
+            kind="activity",
+            at=a.created_at,
+            activity=ActivityPublic.model_validate(a),
+            actor=names.get(a.owner_id),
+        )
         for a in activities
     ]
     return sorted(items, key=lambda i: i.at, reverse=True)

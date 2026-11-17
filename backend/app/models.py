@@ -108,6 +108,12 @@ class PasswordChange(SQLModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class UserDirectoryEntry(BaseModel):
+    id: int
+    name: str
+    role: Role
+
+
 class UserPublic(UserBase):
     id: int
     created_at: datetime
@@ -337,6 +343,13 @@ class DealLost(SQLModel):
     note: str | None = Field(default=None, max_length=2000)
 
 
+class NamedRef(BaseModel):
+    """A linked record's id and display name, so clients don't need extra lookups."""
+
+    id: int
+    name: str
+
+
 class DealPublic(DealBase):
     id: int
     pipeline_id: int
@@ -356,6 +369,11 @@ class DealPublic(DealBase):
     @property
     def is_rotting(self) -> bool:
         return self.rotting_since is not None
+
+    # filled in by app.services.names.with_deal_names
+    owner: NamedRef | None = None
+    contact: NamedRef | None = None
+    company: NamedRef | None = None
 
 
 class DealEvent(SQLModel, table=True):
@@ -444,6 +462,8 @@ class TimelineItem(BaseModel):
     at: datetime
     event: DealEventPublic | None = None
     activity: ActivityPublic | None = None
+    # who made the change (events) or owns the activity; None for automated events
+    actor: NamedRef | None = None
 
 
 class StageSummary(BaseModel):
