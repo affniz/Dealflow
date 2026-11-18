@@ -540,6 +540,7 @@ class AgentConversation(SQLModel, table=True):
     # prompt cache and the earlier turns' thinking
     model: str | None = Field(default=None, max_length=100)
     effort: str | None = Field(default=None, max_length=10)
+    prompt_version: int | None = None  # app.agent.copilot.PROMPTS key; fixed like the model
     input_tokens: int = 0
     output_tokens: int = 0
     created_at: datetime = Field(default_factory=utcnow)

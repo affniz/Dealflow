@@ -115,7 +115,11 @@ def test_reviews_stalled_deals_as_their_owner(session, claude, team):
     assert all(p.status == "pending" for p in props)
 
     first = claude.requests[0]
-    assert first["system"] == pipeline.SYSTEM_PROMPT
+    # the static prefix gets its own cache point, shared by every review
+    assert first["system"] == [
+        {"type": "text", "text": pipeline.SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+    ]
+    assert first["cache_control"] == {"type": "ephemeral"}
     ask, context = first["messages"]
     assert "(“Alice stalled”), 25 days in Lead" in ask["content"]
     assert context["role"] == "system" and "acting for the deal's owner" in context["content"]

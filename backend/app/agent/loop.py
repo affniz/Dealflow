@@ -97,7 +97,9 @@ def run_loop(
         response = client.beta.messages.create(
             model=model,
             max_tokens=16000,
-            system=system,
+            # an explicit cache point after the static prefix (tools + system), shared by every
+            # chat and deal review; automatic caching below covers the growing conversation
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             tools=TOOL_SPECS,
             messages=messages,
             output_config={"effort": effort},

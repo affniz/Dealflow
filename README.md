@@ -90,6 +90,11 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   model's thinking blocks are only valid in an unedited history. The system prompt and tool
   list never change, and per-turn facts (current time, the user, the deal on screen) go in a
   system message after the user's message, so prompt caching keeps working.
+- **Caching**: the tools and system prompt get their own cache point, shared by every chat and
+  deal review; automatic caching covers each conversation's growing history.
+- **Prompt versions**: a chat keeps the Copilot prompt version it started with (like its model),
+  since editing the system prompt of a chat under way would invalidate its earlier reasoning.
+  To change the prompt, add a version in `app/agent/copilot.py`; don't edit an old one.
 - **Safety nets**: a step limit per message, server-side model fallback if a safety classifier
   declines, and a polite reply on refusal.
 - **Pipeline agent** (`app/agent/pipeline.py`) uses the same loop and tools with its own
