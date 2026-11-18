@@ -2,15 +2,21 @@ import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import Session, col, select
 
 from app.agent import copilot
 from app.agent.proposals import can_decide, decide
-from app.api.deps import CurrentUser, SessionDep
+from app.api.access import sees_all
+from app.api.deps import AdminUser, CurrentUser, SessionDep
+from app.core.config import settings
 from app.models import (
     AgentConversation,
     AgentProposal,
     AgentProposalPublic,
+    AgentRun,
+    AgentRunPublic,
     ChatItem,
     ConversationSummary,
     ConversationView,
@@ -130,9 +136,19 @@ def _own_conversation(session: Session, user: User, conv_id: int, lock: bool = F
     return conv
 
 
-@router.get("/copilot/status")
-def copilot_status(_: CurrentUser, client: ClientDep) -> dict[str, bool]:
-    return {"enabled": client is not None}
+class AgentStatus(BaseModel):
+    enabled: bool
+    review_hour: int  # local hour of the daily pipeline review
+    timezone: str
+
+
+@router.get("/copilot/status", response_model=AgentStatus)
+def copilot_status(_: CurrentUser, client: ClientDep) -> AgentStatus:
+    return AgentStatus(
+        enabled=client is not None,
+        review_hour=settings.PIPELINE_REVIEW_HOUR,
+        timezone=settings.TIMEZONE,
+    )
 
 
 @router.post("/copilot/messages", response_model=ConversationView)
@@ -193,10 +209,11 @@ def list_proposals(
     user: CurrentUser,
     proposal_status: ProposalStatus | None = Query(None, alias="status"),
     deal_id: int | None = None,
+    everyone: bool = Query(False, description="Admins only: include other people's proposals"),
 ) -> list[AgentProposalPublic]:
-    """Proposals waiting on (or decided by) this user. Admins see everyone's."""
+    """Proposals made for this user (admins can ask for everyone's)."""
     stmt = select(AgentProposal)
-    if user.role not in (Role.owner, Role.admin):
+    if not (everyone and user.role in (Role.owner, Role.admin)):
         stmt = stmt.where(AgentProposal.user_id == user.id)
     if proposal_status is not None:
         stmt = stmt.where(AgentProposal.status == proposal_status)
@@ -204,6 +221,63 @@ def list_proposals(
         stmt = stmt.where(AgentProposal.deal_id == deal_id)
     rows = session.exec(stmt.order_by(col(AgentProposal.created_at).desc()).limit(100)).all()
     return _proposals_public(session, list(rows))
+
+
+@router.get("/agent/runs", response_model=list[AgentRunPublic])
+def list_agent_runs(
+    session: SessionDep, user: CurrentUser, limit: int = Query(20, ge=1, le=100)
+) -> list[AgentRunPublic]:
+    """Recent pipeline-agent reviews: agents see reviews of their own deals."""
+    stmt = select(AgentRun).order_by(col(AgentRun.created_at).desc()).limit(limit)
+    if not sees_all(user):
+        stmt = stmt.where(AgentRun.user_id == user.id)
+    runs = session.exec(stmt).all()
+    run_ids = [r.id for r in runs]
+    counts = (
+        dict(
+            session.exec(
+                select(AgentProposal.run_id, func.count())
+                .where(col(AgentProposal.run_id).in_(run_ids))
+                .group_by(AgentProposal.run_id)
+            ).all()
+        )
+        if run_ids
+        else {}
+    )
+    deal_ids = {r.deal_id for r in runs if r.deal_id}
+    titles = (
+        {d.id: d.title for d in session.exec(select(Deal).where(col(Deal.id).in_(deal_ids)))}
+        if deal_ids
+        else {}
+    )
+    out = []
+    for r in runs:
+        pub = AgentRunPublic.model_validate(r, update={"proposal_count": counts.get(r.id, 0)})
+        if r.deal_id in titles:
+            pub.deal = NamedRef(id=r.deal_id, name=titles[r.deal_id])  # type: ignore[arg-type]
+        out.append(pub)
+    return out
+
+
+@router.post("/agent/pipeline-review", status_code=status.HTTP_202_ACCEPTED)
+def start_pipeline_review(_: AdminUser, client: ClientDep) -> dict[str, bool]:
+    """Queue a pipeline review now instead of waiting for the morning run."""
+    if client is None:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The pipeline agent isn't set up on this server yet (ANTHROPIC_API_KEY is missing).",
+        )
+    from app.worker import pipeline_review_task
+
+    try:
+        pipeline_review_task.delay()
+    except Exception:  # broker down: say so instead of a bare 500
+        log.exception("Couldn't queue the pipeline review")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The background worker isn't reachable, so the review couldn't start.",
+        ) from None
+    return {"queued": True}
 
 
 def _proposal(session: Session, user: User, proposal_id: int) -> AgentProposal:

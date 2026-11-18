@@ -11,6 +11,7 @@ from app.models import (
     Activity,
     ActivityPublic,
     AgentProposal,
+    AgentRun,
     Deal,
     DealCreate,
     DealEvent,
@@ -104,6 +105,9 @@ def delete_deal(session: SessionDep, user: WriterUser, deal_id: int) -> Response
     deal = get_visible(session, Deal, deal_id, user)
     for event in session.exec(select(DealEvent).where(DealEvent.deal_id == deal_id)):
         session.delete(event)
+    for run in session.exec(select(AgentRun).where(AgentRun.deal_id == deal_id)):
+        run.deal_id = None  # keep the review record, minus the link
+        session.add(run)
     for proposal in session.exec(select(AgentProposal).where(AgentProposal.deal_id == deal_id)):
         proposal.deal_id = None
         if proposal.status == ProposalStatus.pending:
