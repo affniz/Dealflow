@@ -44,6 +44,7 @@ COMPANIES = [
     ("Orbit Fintech", "orbitfin.in", "Fintech"),
     ("Saffron Hotels", "saffronhotels.in", "Hospitality"),
     ("Tarang Media", "tarangmedia.in", "Media"),
+    ("Banyan Retail", "banyanretail.in", "Retail"),
 ]
 
 CONTACTS = [
@@ -53,6 +54,7 @@ CONTACTS = [
     ("Kabir", "Singh", "VP Finance", 3),
     ("Isha", "Nair", "General Manager", 4),
     ("Dev", "Malhotra", "Marketing Director", 5),
+    ("Neha", "Kapoor", "COO", 6),
 ]
 
 # title, value, stage index, owner (0 Meera, 1 Arjun, 2 Sana), contact index, days in stage
@@ -64,9 +66,22 @@ DEALS = [
     ("Payments reconciliation", 680000, 1, 2, 3, 4),
     ("Loyalty programme revamp", 320000, 0, 1, 4, 2),
     ("Ad inventory dashboard", 150000, 0, 2, 5, 1),
-    ("Multi-city expansion", 950000, 3, 0, 4, 11),
+    ("Multi-city expansion", 950000, 3, 0, 6, 11),
     ("Supplier portal", 210000, 1, 1, 1, 18),  # stalled
 ]
+
+
+def account_owners() -> dict[int, int]:
+    """Contact index -> owner index, from the deals that use each contact.
+
+    A sales rep only sees contacts and companies they own, so each rep's deals must point at
+    their own accounts (otherwise the Copilot can't find or link them for that rep).
+    """
+    owners: dict[int, int] = {}
+    for title, _value, _stage, owner, contact, _days in DEALS:
+        if owners.setdefault(contact, owner) != owner:
+            raise ValueError(f"{title!r} shares contact {CONTACTS[contact][0]} with another owner")
+    return owners
 
 
 def load(session: Session) -> None:
@@ -86,15 +101,19 @@ def load(session: Session) -> None:
     session.flush()
     sellers = users[1:4]  # Meera (admin), Arjun and Sana (agents)
 
+    owner_of_contact = account_owners()
+    # each company has one contact here, so it belongs to that contact's owner
+    owner_of_company = {CONTACTS[ci][3]: oi for ci, oi in owner_of_contact.items()}
     companies = []
     for i, (name, domain, industry) in enumerate(COMPANIES):
-        c = Company(name=name, domain=domain, industry=industry, owner_id=sellers[i % 3].id)
+        owner = sellers[owner_of_company.get(i, 0)]
+        c = Company(name=name, domain=domain, industry=industry, owner_id=owner.id)
         session.add(c)
         companies.append(c)
     session.flush()
 
     contacts = []
-    for first, last, title, ci in CONTACTS:
+    for index, (first, last, title, ci) in enumerate(CONTACTS):
         c = Contact(
             first_name=first,
             last_name=last,
@@ -102,7 +121,7 @@ def load(session: Session) -> None:
             email=f"{first.lower()}@{COMPANIES[ci][1]}",
             phone=f"+91 98{ci}00 1{ci}2{ci}3",
             company_id=companies[ci].id,
-            owner_id=companies[ci].owner_id,
+            owner_id=sellers[owner_of_contact.get(index, 0)].id,
         )
         session.add(c)
         contacts.append(c)

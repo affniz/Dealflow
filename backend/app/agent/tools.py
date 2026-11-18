@@ -39,6 +39,7 @@ from app.models import (
     utcnow,
 )
 from app.services.names import contact_name, user_refs, with_deal_names
+from app.services.rotting import AUTO_REMINDER
 from app.services.stats import money, open_totals_by_stage, weighted
 
 
@@ -157,9 +158,15 @@ def get_deal(ctx: ToolContext, inp: GetDeal) -> Any:
     for a in activities:
         state = "done" if a.done else f"open, due {a.due_at:%Y-%m-%d %H:%M}" if a.due_at else "open"
         who = names[a.owner_id].name if a.owner_id in names else "?"
-        text = f"{who}: {a.type} #{a.id} ({state}) {a.subject!r}"
-        if a.body:
-            text += f": {a.body[:500]!r}"
+        if a.via == AUTO_REMINDER:
+            # Dealflow's own generic nudge: say so, or it reads as a planned next step
+            text = f"Dealflow (automatic stalled-deal reminder, not a plan): task #{a.id} ({state})"
+        else:
+            text = f"{who}: {a.type} #{a.id} ({state}) {a.subject!r}"
+            if a.via:
+                text += f" [added via {a.via.replace('_', ' ')}]"
+            if a.body:
+                text += f": {a.body[:500]!r}"
         history.append((a.created_at, text))
     history.sort()
 

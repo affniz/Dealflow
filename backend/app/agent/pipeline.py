@@ -52,7 +52,10 @@ the next two working days during business hours in the team's time zone.
    - A stage move only if the history shows the deal already progressed beyond its stage.
    - Mark it lost only if the history clearly says the customer declined; pick the closest lost \
 reason from pipeline_overview.
-   Don't duplicate an open task that already covers the next step, and don't invent facts.
+   Don't duplicate an open task a person already planned, and don't invent facts.
+   The history may include an automatic stalled-deal reminder from Dealflow. It's a generic \
+nudge, not a plan: never treat it as covering the next step. When you propose a specific \
+follow-up, also propose completing that reminder (it counts toward your two proposals).
 3. Finish with a note to the owner in one or two sentences: what's going on and what you \
 proposed. Write it to them directly ("You last spoke to Priya..."), with no greeting.
 

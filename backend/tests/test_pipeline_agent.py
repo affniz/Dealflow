@@ -1,5 +1,6 @@
 """The pipeline agent, with a scripted stand-in for Claude."""
 
+import json
 import re
 from datetime import timedelta
 from typing import Any
@@ -241,3 +242,20 @@ def test_deleting_a_reviewed_deal_keeps_the_run(client, session, claude, team):
     run = session.exec(select(AgentRun).order_by(AgentRun.id)).first()
     session.refresh(run)
     assert run.deal_id is None and run.summary
+
+
+def test_agent_is_told_the_reminder_is_not_a_plan(session, claude, team):
+    review_stalled_deals(session, claude)
+    deal_result = next(
+        b["content"]
+        for req in claude.requests
+        for m in req["messages"]
+        if m["role"] == "user" and isinstance(m["content"], list)
+        for b in m["content"]
+        if b.get("tool_use_id", "").startswith("get_")
+    )
+    history = json.loads(deal_result)["history"]
+    reminder = [h for h in history if "automatic stalled-deal reminder" in h]
+    assert len(reminder) == 1 and "not a plan" in reminder[0]
+    assert not any("Follow up, or move it" in h for h in history)  # its generic text is hidden
+    assert "never treat it as covering the next step" in pipeline.SYSTEM_PROMPT.replace("\n", " ")
