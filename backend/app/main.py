@@ -12,6 +12,7 @@ from app.api.routes import (
     deals,
     login,
     pipelines,
+    usage,
     users,
 )
 from app.core.config import settings
@@ -49,6 +50,7 @@ for module in (
     activities,
     dashboard,
     copilot,
+    usage,
 ):
     api.include_router(module.router)
 app.include_router(api, prefix=settings.API_V1_STR)

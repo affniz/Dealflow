@@ -13,11 +13,13 @@ from sqlalchemy import text
 from sqlmodel import Session, col, select
 
 from app.agent.loop import MessagesClient, run_loop
+from app.agent.usage import persist_after_failure
 from app.core.config import settings
 from app.core.time import local
 from app.models import (
     AgentProposal,
     AgentRun,
+    AIUsage,
     Deal,
     DealStatus,
     Pipeline,
@@ -124,6 +126,7 @@ def review_deal(session: Session, client: MessagesClient, deal: Deal) -> AgentRu
     run = AgentRun(kind=KIND, deal_id=deal_id, user_id=owner_id, status=RunStatus.completed)  # type: ignore[arg-type]
     session.add(run)
     session.flush()  # proposals reference the run's id
+    billed: list[AIUsage] = []
     try:
         result = run_loop(
             session,
@@ -136,6 +139,7 @@ def review_deal(session: Session, client: MessagesClient, deal: Deal) -> AgentRu
             step_limit_reply="(Review stopped: step limit reached.)",
             run_id=run.id,
             max_proposals=MAX_PROPOSALS_PER_DEAL,
+            usage_sink=billed,
         )
     except Exception as exc:
         # throw away anything half-done for this deal, keep a record of the failure
@@ -150,6 +154,7 @@ def review_deal(session: Session, client: MessagesClient, deal: Deal) -> AgentRu
         )
         session.add(failed)
         session.commit()
+        persist_after_failure(session, billed, run_id=failed.id)  # still billed
         return failed
     run.messages = result.messages
     run.summary = result.final_text or None

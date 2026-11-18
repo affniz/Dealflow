@@ -5,6 +5,7 @@ import { RequireAdmin, RequireAuth } from "@/components/RouteGuards"
 import { BoardPage } from "@/pages/BoardPage"
 import { DealPage } from "@/pages/DealPage"
 import { InboxPage } from "@/pages/InboxPage"
+import { UsagePage } from "@/pages/UsagePage"
 import { LoginPage } from "@/pages/LoginPage"
 import { PlaceholderPage } from "@/pages/PlaceholderPage"
 
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
             element: <RequireAdmin />,
             children: [
               { path: "settings", element: <PlaceholderPage title="Settings" milestone="3f" /> },
+              { path: "usage", element: <UsagePage /> },
             ],
           },
           { path: "*", element: <Navigate to="/" replace /> },

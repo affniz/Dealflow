@@ -651,3 +651,73 @@ class ConversationSummary(BaseModel):
     id: int
     title: str
     updated_at: datetime
+
+
+class AIUsage(SQLModel, table=True):
+    """One model's share of one Claude API call: what was used and what it cost.
+
+    A call that falls back to another model produces one row per model that ran.
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+    feature: str = Field(max_length=30, index=True)  # "copilot" or "pipeline_agent"
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    turn_id: str = Field(max_length=32, index=True)  # one Copilot question or one deal review
+    conversation_id: int | None = Field(default=None, foreign_key="agentconversation.id")
+    run_id: int | None = Field(default=None, foreign_key="agentrun.id")
+    model: str = Field(max_length=100)
+    request_id: str | None = Field(default=None, max_length=100)
+    input_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: Decimal | None = Field(default=None, max_digits=12, decimal_places=6)
+
+
+class UsageTotals(BaseModel):
+    cost_usd: Decimal
+    calls: int
+    units: int  # Copilot questions or deal reviews
+    input_tokens: int
+    cache_read_tokens: int
+    cache_write_tokens: int
+    output_tokens: int
+
+
+class FeatureUsage(UsageTotals):
+    feature: str
+    avg_cost_per_unit: Decimal | None
+
+
+class ModelUsage(UsageTotals):
+    model: str
+
+
+class UserUsage(BaseModel):
+    user: NamedRef | None  # None: the user was deleted
+    copilot_cost_usd: Decimal
+    pipeline_cost_usd: Decimal
+    copilot_questions: int
+
+
+class DailyUsage(BaseModel):
+    date: date
+    cost_usd: Decimal
+
+
+class UsageSummary(BaseModel):
+    month: str  # YYYY-MM in the team's time zone
+    prices_as_of: str
+    total: UsageTotals
+    by_feature: list[FeatureUsage]
+    by_model: list[ModelUsage]
+    by_user: list[UserUsage]
+    daily: list[DailyUsage]
+    unpriced_calls: int  # calls to models missing from the price table
+
+
+class MyUsage(BaseModel):
+    month: str
+    cost_usd: Decimal
+    questions: int

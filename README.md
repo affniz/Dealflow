@@ -57,6 +57,14 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   suggestions or a review in the last 3 days are skipped, one failed deal doesn't stop the run,
   and a database lock stops two workers reviewing at once
 
+**AI usage tracking**
+- Every Claude call is recorded with its model, token counts (input, cache reads, cache writes,
+  output) and cost in USD from a dated price table (`app/agent/pricing.py`); a call that falls
+  back to another model is billed per model. Calls made before a failed turn are still recorded
+- Admins get an **AI usage** page: month spend, cost per Copilot question and per deal review,
+  daily spend, and breakdowns by feature, person and model. Everyone sees their own Copilot
+  spend in the Copilot panel
+
 ### How the Copilot works
 
 - **Loop** (`app/agent/copilot.py`): a tool-use loop on the Claude Messages API, run in the
@@ -118,8 +126,14 @@ npm install
 npm run dev
 ```
 
-To turn on the Copilot, put an Anthropic API key in `backend/.env` (`ANTHROPIC_API_KEY=...`)
-and restart the API. Everything else works without it.
+To turn on the AI features, put an Anthropic API key in `backend/.env` (`ANTHROPIC_API_KEY=...`)
+or sign in with `ant auth login`, then restart the API. Everything else works without it.
+
+To try the agents against the real models and see what each question costs (on a demo database):
+
+```bash
+cd backend && uv run python scripts/live_check.py --model claude-sonnet-5-5
+```
 
 Open http://localhost:5173 and sign in as `owner@example.com` / `changethis123` (from `.env`) or a
 demo user. The API's interactive docs are at http://localhost:8000/docs.
@@ -150,7 +164,7 @@ backend/app/
   api/deps.py          DB session, current user, role checks
   api/routes/          one file per resource
   agent/               AI agents: shared tool-use loop, tools, Copilot, pipeline agent,
-                       proposal approval
+                       proposal approval, usage ledger and prices
   services/actions.py  every change to deals and activities (used by the API and the agents)
   services/rotting.py  stalled-deal check (run by the worker)
   services/stats.py    totals and weighted forecasts

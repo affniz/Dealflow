@@ -32,7 +32,10 @@ def _ask(client, h, text, **extra):
     return client.post(f"{API}/copilot/messages", headers=h, json={"text": text, **extra})
 
 
-def test_not_configured_without_api_key(client, login):
+def test_not_configured_without_api_key(client, login, monkeypatch):
+    # a developer's own `ant` login or env key must not leak into this test
+    monkeypatch.setattr(copilot.settings, "ANTHROPIC_API_KEY", None)
+    monkeypatch.setattr(copilot, "_sdk_has_credentials", lambda: False)
     h = login(Role.agent)
     assert client.get(f"{API}/copilot/status", headers=h).json() == {
         "enabled": False,

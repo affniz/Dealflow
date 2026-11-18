@@ -1,5 +1,6 @@
 import {
   Building2,
+  Gauge,
   ChartColumn,
   Inbox,
   ListChecks,
@@ -43,7 +44,13 @@ export function AppLayout() {
   })
   const pendingCount = pending.data?.length ?? 0
   const name = user?.full_name || user?.email || ""
-  const nav = isAdmin ? [...NAV, { to: "/settings", label: "Settings", icon: Settings }] : NAV
+  const nav = isAdmin
+    ? [
+        ...NAV,
+        { to: "/usage", label: "AI usage", icon: Gauge },
+        { to: "/settings", label: "Settings", icon: Settings },
+      ]
+    : NAV
 
   const sidebar = (
     <nav className="flex h-full flex-col gap-1 p-3" aria-label="Main">
