@@ -3,6 +3,8 @@ from typing import Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
 DEV_SECRET = "dev-only-insecure-secret-change-me-before-deploying"
 
 
@@ -33,8 +35,11 @@ class Settings(BaseSettings):
 
     # AI agents (Claude Messages API). Without a key, AI features report they're not set up.
     ANTHROPIC_API_KEY: str | None = None
-    AGENT_MODEL: str = "claude-opus-5-5"
-    AGENT_EFFORT: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    # Defaults for each agent; admins can change them in Settings (stored in the database).
+    COPILOT_MODEL: str = "claude-sonnet-5-5"
+    COPILOT_EFFORT: Effort = "medium"
+    PIPELINE_MODEL: str = "claude-sonnet-5-5"
+    PIPELINE_EFFORT: Effort = "medium"
     COPILOT_MAX_STEPS: int = 8  # model calls per user message, to bound cost and latency
 
     # Pipeline agent: reviews stalled deals every morning and proposes next steps

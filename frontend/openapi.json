@@ -3027,6 +3027,78 @@
         }
       }
     },
+    "/api/v1/settings/ai": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Read Ai Settings",
+        "description": "Which model and effort each agent uses, and the models that can be chosen.",
+        "operationId": "settings-read_ai_settings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISettingsView"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Change Ai Settings",
+        "description": "Change an agent's model or effort. Copilot chats already under way keep theirs.",
+        "operationId": "settings-change_ai_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AISettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AISettingsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -3055,6 +3127,147 @@
   },
   "components": {
     "schemas": {
+      "AISettings": {
+        "properties": {
+          "copilot_model": {
+            "type": "string",
+            "title": "Copilot Model"
+          },
+          "copilot_effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "title": "Copilot Effort"
+          },
+          "pipeline_model": {
+            "type": "string",
+            "title": "Pipeline Model"
+          },
+          "pipeline_effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "title": "Pipeline Effort"
+          }
+        },
+        "type": "object",
+        "required": [
+          "copilot_model",
+          "copilot_effort",
+          "pipeline_model",
+          "pipeline_effort"
+        ],
+        "title": "AISettings"
+      },
+      "AISettingsUpdate": {
+        "properties": {
+          "copilot_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copilot Model"
+          },
+          "copilot_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copilot Effort"
+          },
+          "pipeline_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Model"
+          },
+          "pipeline_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Effort"
+          }
+        },
+        "type": "object",
+        "title": "AISettingsUpdate"
+      },
+      "AISettingsView": {
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/AISettings"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelOption"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "efforts": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
+            "type": "array",
+            "title": "Efforts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "settings",
+          "models",
+          "efforts"
+        ],
+        "title": "AISettingsView"
+      },
       "ActivityCreate": {
         "properties": {
           "type": {
@@ -4292,6 +4505,17 @@
             "type": "string",
             "title": "Title"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ChatItem"
@@ -5033,6 +5257,39 @@
           "message"
         ],
         "title": "Message"
+      },
+      "ModelOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "input_usd_per_mtok": {
+            "type": "string",
+            "title": "Input Usd Per Mtok"
+          },
+          "output_usd_per_mtok": {
+            "type": "string",
+            "title": "Output Usd Per Mtok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "note",
+          "input_usd_per_mtok",
+          "output_usd_per_mtok"
+        ],
+        "title": "ModelOption"
       },
       "ModelUsage": {
         "properties": {

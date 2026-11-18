@@ -17,8 +17,8 @@ from sqlmodel import Session
 
 from app.agent.tools import TOOL_SPECS, TOOLS_BY_NAME, ToolContext, ToolError
 from app.agent.usage import records_from_response
-from app.core.config import settings
 from app.models import AIUsage, User
+from app.services.ai_settings import model_info
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +41,13 @@ class LoopResult:
     refused: bool = False
     final_text: str = ""
     proposal_ids: list[int] = field(default_factory=list)
+
+
+def _fallback_params(model: str) -> dict[str, Any]:
+    """If a safety classifier declines, the API retries on a fallback model (where offered)."""
+    if not model_info(model).server_fallback:
+        return {}
+    return {"betas": [FALLBACK_BETA], "fallbacks": "default"}
 
 
 def run_tool(ctx: ToolContext, name: str, raw_input: Any) -> tuple[str, bool]:
@@ -68,6 +75,8 @@ def run_loop(
     client: MessagesClient,
     *,
     user: User,
+    model: str,
+    effort: str,
     system: str,
     messages: list[dict[str, Any]],
     source: str,
@@ -86,16 +95,14 @@ def run_loop(
 
     for step in range(max_steps):
         response = client.beta.messages.create(
-            model=settings.AGENT_MODEL,
+            model=model,
             max_tokens=16000,
             system=system,
             tools=TOOL_SPECS,
             messages=messages,
-            output_config={"effort": settings.AGENT_EFFORT},
+            output_config={"effort": effort},
             cache_control={"type": "ephemeral"},
-            # if a safety classifier declines, the API retries on a fallback model
-            betas=[FALLBACK_BETA],
-            fallbacks="default",
+            **_fallback_params(model),
         )
         for row in records_from_response(
             response,

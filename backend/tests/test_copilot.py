@@ -79,7 +79,7 @@ def test_read_tool_loop_and_request_shape(client, login, claude, session, stages
     ]
 
     first, second = claude.requests
-    assert first["model"] == "claude-opus-5-5"
+    assert first["model"] == "claude-sonnet-5-5"  # the default for the Copilot
     assert first["output_config"] == {"effort": "medium"}
     assert first["tools"] == TOOL_SPECS and first["fallbacks"] == "default"
     user_msg, context = first["messages"][-2:]
