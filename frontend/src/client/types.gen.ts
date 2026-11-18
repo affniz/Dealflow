@@ -321,6 +321,10 @@ export type AgentStatus = {
      * Timezone
      */
     timezone: string;
+    /**
+     * Pipeline Budget Reached
+     */
+    pipeline_budget_reached?: string | null;
 };
 
 /**
@@ -408,6 +412,56 @@ export type BodyLoginLogin = {
      * Client Secret
      */
     client_secret?: string | null;
+};
+
+/**
+ * BudgetStatus
+ */
+export type BudgetStatus = {
+    /**
+     * Budget Usd
+     */
+    budget_usd: string | null;
+    /**
+     * Spent Usd
+     */
+    spent_usd: string;
+    /**
+     * Used Pct
+     */
+    used_pct: number | null;
+};
+
+/**
+ * Budgets
+ *
+ * Monthly AI spending limits in USD; None means no limit.
+ */
+export type BudgetsInput = {
+    /**
+     * Copilot Per Person Usd
+     */
+    copilot_per_person_usd?: number | string | null;
+    /**
+     * Pipeline Team Usd
+     */
+    pipeline_team_usd?: number | string | null;
+};
+
+/**
+ * Budgets
+ *
+ * Monthly AI spending limits in USD; None means no limit.
+ */
+export type BudgetsOutput = {
+    /**
+     * Copilot Per Person Usd
+     */
+    copilot_per_person_usd?: string | null;
+    /**
+     * Pipeline Team Usd
+     */
+    pipeline_team_usd?: string | null;
 };
 
 /**
@@ -1213,6 +1267,18 @@ export type MyUsage = {
      * Questions
      */
     questions: number;
+    /**
+     * Budget Usd
+     */
+    budget_usd?: string | null;
+    /**
+     * Budget Used Pct
+     */
+    budget_used_pct?: number | null;
+    /**
+     * Resets On
+     */
+    resets_on?: string | null;
 };
 
 /**
@@ -1594,6 +1660,11 @@ export type UsageSummary = {
      * Unpriced Calls
      */
     unpriced_calls: number;
+    /**
+     * Copilot Budget Per Person Usd
+     */
+    copilot_budget_per_person_usd?: string | null;
+    pipeline_budget?: BudgetStatus | null;
 };
 
 /**
@@ -3660,6 +3731,47 @@ export type SettingsChangeAiSettingsResponses = {
 };
 
 export type SettingsChangeAiSettingsResponse = SettingsChangeAiSettingsResponses[keyof SettingsChangeAiSettingsResponses];
+
+export type SettingsReadBudgetsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/settings/budgets';
+};
+
+export type SettingsReadBudgetsResponses = {
+    /**
+     * Successful Response
+     */
+    200: BudgetsOutput;
+};
+
+export type SettingsReadBudgetsResponse = SettingsReadBudgetsResponses[keyof SettingsReadBudgetsResponses];
+
+export type SettingsChangeBudgetsData = {
+    body: BudgetsInput;
+    path?: never;
+    query?: never;
+    url: '/api/v1/settings/budgets';
+};
+
+export type SettingsChangeBudgetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SettingsChangeBudgetsError = SettingsChangeBudgetsErrors[keyof SettingsChangeBudgetsErrors];
+
+export type SettingsChangeBudgetsResponses = {
+    /**
+     * Successful Response
+     */
+    200: BudgetsOutput;
+};
+
+export type SettingsChangeBudgetsResponse = SettingsChangeBudgetsResponses[keyof SettingsChangeBudgetsResponses];
 
 export type HealthHealthData = {
     body?: never;

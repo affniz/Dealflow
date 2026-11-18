@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowUp, History, Plus, Search, Sparkles, X } from "lucide-react"
+import { ArrowUp, CircleAlert, History, Plus, Search, Sparkles, X } from "lucide-react"
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react"
 import { useMatch } from "react-router-dom"
 
@@ -290,10 +290,21 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
         }}
         className="border-t border-line bg-surface p-3"
       >
-        {usage.data && Number(usage.data.cost_usd) > 0 && (
-          <p className="mb-2 text-right text-[11px] text-ink-faint">
-            Your Copilot use this month: {formatUsd(usage.data.cost_usd)} · {usage.data.questions}{" "}
-            {usage.data.questions === 1 ? "question" : "questions"}
+        {usage.data && (Number(usage.data.cost_usd) > 0 || usage.data.budget_usd != null) && (
+          <p
+            className={cn(
+              "mb-2 flex items-center justify-end gap-1 text-right text-[11px]",
+              (usage.data.budget_used_pct ?? 0) >= 80
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-ink-faint",
+            )}
+          >
+            {(usage.data.budget_used_pct ?? 0) >= 80 && (
+              <CircleAlert className="size-3" aria-hidden />
+            )}
+            Your Copilot use this month: {formatUsd(usage.data.cost_usd)}
+            {usage.data.budget_usd != null && <> of {formatUsd(usage.data.budget_usd)}</>} ·{" "}
+            {usage.data.questions} {usage.data.questions === 1 ? "question" : "questions"}
           </p>
         )}
         {dealId !== null && deal.data && (

@@ -1,6 +1,5 @@
 """Recording what every Claude call used and cost, and summing it up."""
 
-from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -8,7 +7,7 @@ from sqlalchemy import Date, cast, func
 from sqlmodel import Session, col, select
 
 from app.agent.pricing import PRICES_AS_OF, cost_usd
-from app.core.time import local, team_tz
+from app.core.time import month_bounds, team_tz
 from app.models import (
     AIUsage,
     DailyUsage,
@@ -20,8 +19,8 @@ from app.models import (
     UsageTotals,
     User,
     UserUsage,
-    utcnow,
 )
+from app.services import budgets
 from app.services.names import user_name
 
 # usage.iterations entries that are model calls (compaction/advisor aren't used here)
@@ -74,19 +73,6 @@ def persist_after_failure(session: Session, rows: list[AIUsage], **overrides: An
 
 
 # ---------------------------------------------------------------- summaries
-
-
-def month_bounds(month: str | None) -> tuple[str, datetime, datetime]:
-    """'YYYY-MM' (default: this month) in the team's time zone, as UTC start/end."""
-    tz = team_tz()
-    if month:
-        year, mon = (int(x) for x in month.split("-"))
-        start = datetime(year, mon, 1, tzinfo=tz)
-    else:
-        now = local(utcnow())
-        start = datetime(now.year, now.month, 1, tzinfo=tz)
-    end = (start + timedelta(days=32)).replace(day=1)
-    return f"{start:%Y-%m}", start, end
 
 
 def _money(x: Any) -> Decimal:
@@ -196,7 +182,21 @@ def summary(session: Session, month: str | None) -> UsageSummary:
         by_user=by_user,
         daily=daily,
         unpriced_calls=unpriced,
+        **_budget_fields(session, label),
     )
+
+
+def _budget_fields(session: Session, label: str) -> dict[str, Any]:
+    """Budgets only apply to the current month."""
+    if label != month_bounds(None)[0]:
+        return {}
+    limits = budgets.get_budgets(session)
+    return {
+        "copilot_budget_per_person_usd": limits.copilot_per_person_usd,
+        "pipeline_budget": budgets.status(
+            budgets.pipeline_spent(session), limits.pipeline_team_usd
+        ),
+    }
 
 
 def my_usage(session: Session, user: User, month: str | None) -> MyUsage:
@@ -212,4 +212,12 @@ def my_usage(session: Session, user: User, month: str | None) -> MyUsage:
             col(AIUsage.created_at) < end,
         )
     ).one()
-    return MyUsage(month=label, cost_usd=_money(cost), questions=questions)
+    budget = budgets.get_budgets(session).copilot_per_person_usd if month is None else None
+    return MyUsage(
+        month=label,
+        cost_usd=_money(cost),
+        questions=questions,
+        budget_usd=budget,
+        budget_used_pct=budgets.used_pct(Decimal(str(cost)), budget),
+        resets_on=budgets.resets_on() if month is None else None,
+    )

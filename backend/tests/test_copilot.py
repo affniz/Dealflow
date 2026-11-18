@@ -41,6 +41,7 @@ def test_not_configured_without_api_key(client, login, monkeypatch):
         "enabled": False,
         "review_hour": 7,
         "timezone": "Asia/Kolkata",
+        "pipeline_budget_reached": None,
     }
     r = _ask(client, h, "hello")
     assert r.status_code == 503 and "ANTHROPIC_API_KEY" in r.json()["detail"]

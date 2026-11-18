@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import model_validator
@@ -40,6 +41,10 @@ class Settings(BaseSettings):
     COPILOT_EFFORT: Effort = "medium"
     PIPELINE_MODEL: str = "claude-sonnet-5-5"
     PIPELINE_EFFORT: Effort = "medium"
+
+    # Monthly AI budgets in USD (empty = no limit); admins can change them in Settings.
+    COPILOT_MONTHLY_BUDGET_USD: Decimal | None = Decimal("10")  # per person
+    PIPELINE_MONTHLY_BUDGET_USD: Decimal | None = Decimal("20")  # the whole team
     COPILOT_MAX_STEPS: int = 8  # model calls per user message, to bound cost and latency
 
     # Pipeline agent: reviews stalled deals every morning and proposes next steps

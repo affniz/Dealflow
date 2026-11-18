@@ -712,6 +712,21 @@ class DailyUsage(BaseModel):
     cost_usd: Decimal
 
 
+class Budgets(BaseModel):
+    """Monthly AI spending limits in USD; None means no limit."""
+
+    copilot_per_person_usd: Decimal | None = PydField(
+        default=None, ge=0, le=10000, decimal_places=2
+    )
+    pipeline_team_usd: Decimal | None = PydField(default=None, ge=0, le=10000, decimal_places=2)
+
+
+class BudgetStatus(BaseModel):
+    budget_usd: Decimal | None
+    spent_usd: Decimal
+    used_pct: int | None
+
+
 class UsageSummary(BaseModel):
     month: str  # YYYY-MM in the team's time zone
     prices_as_of: str
@@ -721,12 +736,17 @@ class UsageSummary(BaseModel):
     by_user: list[UserUsage]
     daily: list[DailyUsage]
     unpriced_calls: int  # calls to models missing from the price table
+    copilot_budget_per_person_usd: Decimal | None = None
+    pipeline_budget: BudgetStatus | None = None
 
 
 class MyUsage(BaseModel):
     month: str
     cost_usd: Decimal
     questions: int
+    budget_usd: Decimal | None = None  # this person's Copilot limit; None: no limit
+    budget_used_pct: int | None = None
+    resets_on: date | None = None
 
 
 class AppSetting(SQLModel, table=True):

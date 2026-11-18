@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.time import local
 from app.models import AgentConversation, AIUsage, Deal, Role, User, utcnow
 from app.services.ai_settings import get_ai_settings
+from app.services.budgets import copilot_block_reason
 
 log = logging.getLogger(__name__)
 
@@ -155,6 +156,7 @@ def run_turn(
         "if you'd like me to keep going.",
         conversation_id=conversation.id,
         usage_sink=usage_sink,
+        budget_check=lambda: copilot_block_reason(session, user),
     )
     conversation.input_tokens += result.input_tokens
     conversation.output_tokens += result.output_tokens

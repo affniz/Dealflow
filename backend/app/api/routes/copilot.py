@@ -29,6 +29,7 @@ from app.models import (
     Role,
     User,
 )
+from app.services.budgets import BudgetExceeded, copilot_block_reason, pipeline_block_reason
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["copilot"])
@@ -143,14 +144,16 @@ class AgentStatus(BaseModel):
     enabled: bool
     review_hour: int  # local hour of the daily pipeline review
     timezone: str
+    pipeline_budget_reached: str | None = None  # why reviews are paused, if they are
 
 
 @router.get("/copilot/status", response_model=AgentStatus)
-def copilot_status(_: CurrentUser, client: ClientDep) -> AgentStatus:
+def copilot_status(session: SessionDep, _: CurrentUser, client: ClientDep) -> AgentStatus:
     return AgentStatus(
         enabled=client is not None,
         review_hour=settings.PIPELINE_REVIEW_HOUR,
         timezone=settings.TIMEZONE,
+        pipeline_budget_reached=pipeline_block_reason(session),
     )
 
 
@@ -164,6 +167,8 @@ def send_message(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "Copilot isn't set up on this server yet (ANTHROPIC_API_KEY is missing).",
         )
+    if (reason := copilot_block_reason(session, user)) is not None:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, reason)
     if body.conversation_id is not None:
         conv = _own_conversation(session, user, body.conversation_id, lock=True)
     else:
@@ -184,6 +189,8 @@ def send_message(
     except Exception as exc:
         session.rollback()
         persist_after_failure(session, billed)  # calls made before the failure were billed
+        if isinstance(exc, BudgetExceeded):  # spent by another tab in the meantime
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from None
         if not isinstance(exc, anthropic.APIError):
             raise
         log.warning("Copilot call failed: %s", exc)

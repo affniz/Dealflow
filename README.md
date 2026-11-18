@@ -64,6 +64,15 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - A Copilot chat keeps the model and effort it started with, so its prompt cache and earlier
   reasoning stay valid; changes apply to new chats and the next pipeline review
 
+**AI budgets**
+- Monthly limits in USD: one per person for the Copilot (default $10) and one for the whole
+  team's pipeline agent (default $20); admins change them in Settings, or set no limit
+- Checked before every model call, so a question or review can go over by at most one call. Past
+  the limit, new Copilot questions are refused with the reset date, an answer in progress stops
+  with a note, and the pipeline agent stops reviewing deals for the month
+- Everyone sees their own spend against their limit in the Copilot panel (highlighted from 80%);
+  the AI usage page shows each budget's use
+
 **AI usage tracking**
 - Every Claude call is recorded with its model, token counts (input, cache reads, cache writes,
   output) and cost in USD from a dated price table (`app/agent/pricing.py`); a call that falls
