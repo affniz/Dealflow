@@ -48,7 +48,9 @@ class ToolContext:
     user: User
     source: str  # who is proposing: "copilot" or "pipeline_agent"
     conversation_id: int | None = None
+    run_id: int | None = None
     tool_use_id: str | None = None
+    proposals_left: int | None = None  # None: no limit
 
 
 class ToolError(Exception):
@@ -322,9 +324,12 @@ def _propose(
 ) -> Any:
     if ctx.user.role == Role.viewer:
         raise ToolError("This user is a viewer and can't change anything; just answer in words.")
+    if ctx.proposals_left is not None and ctx.proposals_left <= 0:
+        raise ToolError("You've reached the maximum number of proposals for this review.")
     proposal = AgentProposal(
         source=ctx.source,
         conversation_id=ctx.conversation_id,
+        run_id=ctx.run_id,
         tool_use_id=ctx.tool_use_id,
         user_id=ctx.user.id,  # type: ignore[arg-type]
         deal_id=deal.id if deal else None,

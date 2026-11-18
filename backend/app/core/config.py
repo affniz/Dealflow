@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     AGENT_EFFORT: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     COPILOT_MAX_STEPS: int = 8  # model calls per user message, to bound cost and latency
 
+    # Pipeline agent: reviews stalled deals every morning and proposes next steps
+    PIPELINE_REVIEW_HOUR: int = 7  # local hour (TIMEZONE) for the daily review
+    PIPELINE_REVIEW_MAX_DEALS: int = 20  # per run, to bound cost
+    PIPELINE_REVIEW_MAX_STEPS: int = 5  # model calls per deal
+    PIPELINE_REVIEW_COOLDOWN_DAYS: int = 3  # don't re-review a deal sooner than this
+
     @model_validator(mode="after")
     def _no_dev_secrets_in_prod(self) -> "Settings":
         if self.ENVIRONMENT == "production" and self.SECRET_KEY == DEV_SECRET:

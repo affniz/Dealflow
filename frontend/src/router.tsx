@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout"
 import { RequireAdmin, RequireAuth } from "@/components/RouteGuards"
 import { BoardPage } from "@/pages/BoardPage"
 import { DealPage } from "@/pages/DealPage"
+import { InboxPage } from "@/pages/InboxPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { PlaceholderPage } from "@/pages/PlaceholderPage"
 
@@ -21,7 +22,7 @@ export const router = createBrowserRouter([
           { path: "companies", element: <PlaceholderPage title="Companies" milestone="3e" /> },
           { path: "activities", element: <PlaceholderPage title="My activities" milestone="3e" /> },
           { path: "dashboard", element: <PlaceholderPage title="Dashboard" milestone="3f" /> },
-          { path: "inbox", element: <PlaceholderPage title="Agent inbox" milestone="3d" /> },
+          { path: "inbox", element: <InboxPage /> },
           {
             element: <RequireAdmin />,
             children: [

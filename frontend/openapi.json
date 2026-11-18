@@ -2508,11 +2508,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "type": "object",
-                  "title": "Response Copilot-Copilot Status"
+                  "$ref": "#/components/schemas/AgentStatus"
                 }
               }
             }
@@ -2655,7 +2651,7 @@
           "copilot"
         ],
         "summary": "List Proposals",
-        "description": "Proposals waiting on (or decided by) this user. Admins see everyone's.",
+        "description": "Proposals made for this user (admins can ask for everyone's).",
         "operationId": "copilot-list_proposals",
         "security": [
           {
@@ -2694,6 +2690,18 @@
               ],
               "title": "Deal Id"
             }
+          },
+          {
+            "name": "everyone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Admins only: include other people's proposals",
+              "default": false,
+              "title": "Everyone"
+            },
+            "description": "Admins only: include other people's proposals"
           }
         ],
         "responses": {
@@ -2722,6 +2730,92 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/agent/runs": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "List Agent Runs",
+        "description": "Recent pipeline-agent reviews: agents see reviews of their own deals.",
+        "operationId": "copilot-list_agent_runs",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentRunPublic"
+                  },
+                  "title": "Response Copilot-List Agent Runs"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/pipeline-review": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Start Pipeline Review",
+        "description": "Queue a pipeline review now instead of waiting for the morning run.",
+        "operationId": "copilot-start_pipeline_review",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "type": "object",
+                  "title": "Response Copilot-Start Pipeline Review"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/proposals/{proposal_id}/approve": {
@@ -3175,6 +3269,17 @@
             ],
             "title": "Conversation Id"
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
           "user_id": {
             "type": "integer",
             "title": "User Id"
@@ -3279,6 +3384,113 @@
           "created_at"
         ],
         "title": "AgentProposalPublic"
+      },
+      "AgentRunPublic": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "deal_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deal Id"
+          },
+          "deal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "proposal_count": {
+            "type": "integer",
+            "title": "Proposal Count",
+            "default": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "deal_id",
+          "user_id",
+          "status",
+          "summary",
+          "error",
+          "created_at"
+        ],
+        "title": "AgentRunPublic"
+      },
+      "AgentStatus": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "review_hour": {
+            "type": "integer",
+            "title": "Review Hour"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "review_hour",
+          "timezone"
+        ],
+        "title": "AgentStatus"
       },
       "Board": {
         "properties": {
@@ -4935,6 +5147,14 @@
           "viewer"
         ],
         "title": "Role"
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "failed"
+        ],
+        "title": "RunStatus"
       },
       "StageCreate": {
         "properties": {

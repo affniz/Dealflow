@@ -11,9 +11,11 @@ import {
   Users,
   X,
 } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router-dom"
 
+import { copilotListProposalsOptions } from "@/client/@tanstack/react-query.gen"
 import { CopilotPanel } from "@/components/copilot/CopilotPanel"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/card"
@@ -35,6 +37,11 @@ export function AppLayout() {
   const [open, setOpen] = useState(false)
   const [copilotOpen, setCopilotOpen] = useState(false)
   const { pathname } = useLocation()
+  const pending = useQuery({
+    ...copilotListProposalsOptions({ query: { status: "pending" } }),
+    refetchInterval: 60_000,
+  })
+  const pendingCount = pending.data?.length ?? 0
   const name = user?.full_name || user?.email || ""
   const nav = isAdmin ? [...NAV, { to: "/settings", label: "Settings", icon: Settings }] : NAV
 
@@ -62,7 +69,15 @@ export function AppLayout() {
           }
         >
           <Icon className="size-4" />
-          {label}
+          <span className="flex-1">{label}</span>
+          {to === "/inbox" && pendingCount > 0 && (
+            <span
+              className="rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white"
+              aria-label={`${pendingCount} waiting`}
+            >
+              {pendingCount}
+            </span>
+          )}
         </NavLink>
       ))}
       <Button

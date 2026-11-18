@@ -46,6 +46,17 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   "via Copilot" on the timeline
 - Viewers can ask questions but can't change anything
 
+**Pipeline agent (AI)**
+- Every morning (07:00 in the team's time zone) it reviews each stalled deal as the deal's owner:
+  reads the history, proposes at most two concrete next steps (usually a specific follow-up
+  task) and leaves the owner a short note
+- Suggestions land in the **agent inbox** (sidebar badge shows how many are waiting), next to
+  the agent's notes; approve or reject there or on the deal page. Admins can see everyone's and
+  start a review on demand
+- Bounded by design: a cap on deals per run and model calls per deal, deals with pending
+  suggestions or a review in the last 3 days are skipped, one failed deal doesn't stop the run,
+  and a database lock stops two workers reviewing at once
+
 ### How the Copilot works
 
 - **Loop** (`app/agent/copilot.py`): a tool-use loop on the Claude Messages API, run in the
@@ -66,7 +77,11 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   system message after the user's message, so prompt caching keeps working.
 - **Safety nets**: a step limit per message, server-side model fallback if a safety classifier
   declines, and a polite reply on refusal.
-- **Tests** (`tests/test_copilot.py`) use a scripted stand-in for Claude: no network or API key.
+- **Pipeline agent** (`app/agent/pipeline.py`) uses the same loop and tools with its own
+  prompt, as the deal owner, with a hard cap of two proposals per deal. Each review is stored as
+  an `AgentRun` (note, tokens, full message history) for the inbox and for auditing.
+- **Tests** (`tests/test_copilot.py`, `tests/test_pipeline_agent.py`) use a scripted stand-in for
+  Claude: no network or API key.
 
 ## Run it
 
@@ -81,7 +96,8 @@ uv run bash scripts/prestart.sh    # migrate + create the first owner and defaul
 uv run fastapi dev app/main.py
 ```
 
-In a second terminal, start the background worker and its scheduler:
+In a second terminal, start the background worker and its scheduler (stalled-deal checks every
+hour, pipeline agent every morning):
 
 ```bash
 cd backend && uv run celery -A app.worker worker --beat --loglevel=info
@@ -133,7 +149,8 @@ backend/app/
   api/access.py        record-level access rules (who sees and edits what)
   api/deps.py          DB session, current user, role checks
   api/routes/          one file per resource
-  agent/               Copilot: tool-use loop, tools, proposal approval
+  agent/               AI agents: shared tool-use loop, tools, Copilot, pipeline agent,
+                       proposal approval
   services/actions.py  every change to deals and activities (used by the API and the agents)
   services/rotting.py  stalled-deal check (run by the worker)
   services/stats.py    totals and weighted forecasts
@@ -157,7 +174,7 @@ frontend/src/
   - [x] 3a: front-end skeleton, sign-in, generated API client, read-only board
   - [x] 3b: drag-and-drop board, deal page with timeline
   - [x] 3c: agent foundation: shared action layer, Copilot chat with approval of every change
-  - [ ] 3d: pipeline agent that reviews stalled deals nightly, and an agent inbox
+  - [x] 3d: pipeline agent that reviews stalled deals every morning, and an agent inbox
   - [ ] 3e: contacts, companies, my activities
   - [ ] 3f: dashboard charts, admin settings
   - [ ] 3g: end-to-end tests and CI; MCP server so Claude can work with Dealflow directly

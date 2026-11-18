@@ -163,6 +163,10 @@ export type AgentProposalPublic = {
      */
     conversation_id: number | null;
     /**
+     * Run Id
+     */
+    run_id?: number | null;
+    /**
      * User Id
      */
     user_id: number;
@@ -200,6 +204,64 @@ export type AgentProposalPublic = {
      * Created At
      */
     created_at: string;
+};
+
+/**
+ * AgentRunPublic
+ */
+export type AgentRunPublic = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Deal Id
+     */
+    deal_id: number | null;
+    deal?: NamedRef | null;
+    /**
+     * User Id
+     */
+    user_id: number;
+    status: RunStatus;
+    /**
+     * Summary
+     */
+    summary: string | null;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Proposal Count
+     */
+    proposal_count?: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * AgentStatus
+ */
+export type AgentStatus = {
+    /**
+     * Enabled
+     */
+    enabled: boolean;
+    /**
+     * Review Hour
+     */
+    review_hour: number;
+    /**
+     * Timezone
+     */
+    timezone: string;
 };
 
 /**
@@ -1165,6 +1227,11 @@ export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'failed';
  * Role
  */
 export type Role = 'owner' | 'admin' | 'agent' | 'viewer';
+
+/**
+ * RunStatus
+ */
+export type RunStatus = 'completed' | 'failed';
 
 /**
  * StageCreate
@@ -2966,13 +3033,9 @@ export type CopilotCopilotStatusData = {
 
 export type CopilotCopilotStatusResponses = {
     /**
-     * Response Copilot-Copilot Status
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: boolean;
-    };
+    200: AgentStatus;
 };
 
 export type CopilotCopilotStatusResponse = CopilotCopilotStatusResponses[keyof CopilotCopilotStatusResponses];
@@ -3062,6 +3125,12 @@ export type CopilotListProposalsData = {
          * Deal Id
          */
         deal_id?: number | null;
+        /**
+         * Everyone
+         *
+         * Admins only: include other people's proposals
+         */
+        everyone?: boolean;
     };
     url: '/api/v1/proposals';
 };
@@ -3085,6 +3154,58 @@ export type CopilotListProposalsResponses = {
 };
 
 export type CopilotListProposalsResponse = CopilotListProposalsResponses[keyof CopilotListProposalsResponses];
+
+export type CopilotListAgentRunsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v1/agent/runs';
+};
+
+export type CopilotListAgentRunsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CopilotListAgentRunsError = CopilotListAgentRunsErrors[keyof CopilotListAgentRunsErrors];
+
+export type CopilotListAgentRunsResponses = {
+    /**
+     * Response Copilot-List Agent Runs
+     *
+     * Successful Response
+     */
+    200: Array<AgentRunPublic>;
+};
+
+export type CopilotListAgentRunsResponse = CopilotListAgentRunsResponses[keyof CopilotListAgentRunsResponses];
+
+export type CopilotStartPipelineReviewData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/agent/pipeline-review';
+};
+
+export type CopilotStartPipelineReviewResponses = {
+    /**
+     * Response Copilot-Start Pipeline Review
+     *
+     * Successful Response
+     */
+    202: {
+        [key: string]: boolean;
+    };
+};
+
+export type CopilotStartPipelineReviewResponse = CopilotStartPipelineReviewResponses[keyof CopilotStartPipelineReviewResponses];
 
 export type CopilotApproveProposalData = {
     body?: never;

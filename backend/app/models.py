@@ -542,6 +542,42 @@ class AgentConversation(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow, index=True)
 
 
+class RunStatus(StrEnum):
+    completed = "completed"
+    failed = "failed"
+
+
+class AgentRun(SQLModel, table=True):
+    """One autonomous agent review of one deal, kept for the inbox and for auditing."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: str = Field(max_length=30)  # "pipeline_review"
+    deal_id: int | None = Field(default=None, foreign_key="deal.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)  # whose access it ran with
+    status: RunStatus = Field(index=True)
+    summary: str | None = None  # the agent's note to the owner
+    error: str | None = None
+    messages: list[dict[str, Any]] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False)
+    )
+    input_tokens: int = 0
+    output_tokens: int = 0
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class AgentRunPublic(SQLModel):
+    id: int
+    kind: str
+    deal_id: int | None
+    deal: NamedRef | None = None
+    user_id: int
+    status: RunStatus
+    summary: str | None
+    error: str | None
+    proposal_count: int = 0
+    created_at: datetime
+
+
 class ProposalStatus(StrEnum):
     pending = "pending"
     approved = "approved"  # approved and applied
@@ -555,6 +591,7 @@ class AgentProposal(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     source: str = Field(max_length=30)  # "copilot" or "pipeline_agent"
     conversation_id: int | None = Field(default=None, foreign_key="agentconversation.id")
+    run_id: int | None = Field(default=None, foreign_key="agentrun.id", index=True)
     tool_use_id: str | None = Field(default=None, max_length=100, index=True)
     # the person it acts for; they (or an admin) approve it, and it runs with their access
     user_id: int = Field(foreign_key="user.id", index=True)
@@ -574,6 +611,7 @@ class AgentProposalPublic(SQLModel):
     id: int
     source: str
     conversation_id: int | None
+    run_id: int | None = None
     user_id: int
     deal_id: int | None
     deal: NamedRef | None = None
