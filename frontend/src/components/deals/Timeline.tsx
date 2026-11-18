@@ -106,11 +106,17 @@ function Row({
   )
 }
 
+const VIA_LABELS: Record<string, string> = {
+  copilot: "via Copilot",
+  pipeline_agent: "via Pipeline agent",
+  auto_reminder: "Automatic reminder",
+}
+
 function ViaBadge({ via }: { via: string }) {
   return (
     <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-brand-50 px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-700">
       <Sparkles className="size-3" aria-hidden />
-      via {via === "pipeline_agent" ? "Pipeline agent" : "Copilot"}
+      {VIA_LABELS[via] ?? `via ${via.replaceAll("_", " ")}`}
     </span>
   )
 }

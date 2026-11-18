@@ -15,6 +15,9 @@ from sqlmodel import Session, col, select
 
 from app.models import Activity, ActivityType, Deal, DealEvent, DealStatus, Pipeline, utcnow
 
+# Activity.via of the generic reminder this job adds. Agents treat it as a nudge, not a plan.
+AUTO_REMINDER = "auto_reminder"
+
 
 @dataclass
 class RottingResult:
@@ -61,6 +64,7 @@ def check_rotting(session: Session, now: datetime | None = None) -> RottingResul
                 contact_id=deal.contact_id,
                 company_id=deal.company_id,
                 owner_id=deal.owner_id,
+                via=AUTO_REMINDER,
             )
         )
 

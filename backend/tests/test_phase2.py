@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from sqlmodel import col
+
 from app.models import Deal, Role, utcnow
 from app.services.rotting import check_rotting
 from tests.conftest import API
@@ -171,3 +173,30 @@ def test_board_filters_apply_to_deals_and_totals(client, login, session, stages)
     # an agent filtering by someone else's id still only sees their own (empty) slice
     bob_view = client.get(url, headers=bob, params={"owner_id": alice_id}).json()["columns"][0]
     assert bob_view["deal_count"] == 0
+
+
+def test_demo_data_gives_each_rep_their_own_accounts(session):
+    from sqlmodel import select
+
+    from app.demo_data import load
+    from app.models import Activity, Company, Contact
+
+    load(session)
+    for deal in session.exec(select(Deal).where(col(Deal.contact_id).is_not(None))).all():
+        contact = session.get(Contact, deal.contact_id)
+        company = session.get(Company, deal.company_id)
+        assert contact.owner_id == deal.owner_id == company.owner_id, deal.title
+    reminders = session.exec(select(Activity).where(Activity.via == "auto_reminder")).all()
+    assert len(reminders) == 2  # one per stalled deal, labelled as automatic
+
+
+def test_demo_data_rejects_shared_contacts(monkeypatch):
+    import pytest
+
+    from app import demo_data
+
+    monkeypatch.setattr(
+        demo_data, "DEALS", [("A", 1, 0, 1, 0, 1), ("B", 1, 0, 2, 0, 1)]
+    )  # two owners, one contact
+    with pytest.raises(ValueError, match="shares contact Priya"):
+        demo_data.account_owners()
