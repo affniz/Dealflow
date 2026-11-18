@@ -154,6 +154,15 @@ export function InboxPage() {
             It reviews stalled deals {schedule} and leaves a note for each deal's owner.
             {status.data?.enabled === false && " AI isn't set up on this server yet."}
           </p>
+          {status.data?.pipeline_budget_reached && (
+            <p
+              role="status"
+              className="flex items-start gap-1.5 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+            >
+              <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
+              Reviews are paused: {status.data.pipeline_budget_reached}
+            </p>
+          )}
           {runs.isPending ? (
             <Spinner />
           ) : runs.data?.length ? (

@@ -8,6 +8,7 @@ only ever appended to, and is returned exactly as sent to the API.
 import json
 import logging
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -19,6 +20,7 @@ from app.agent.tools import TOOL_SPECS, TOOLS_BY_NAME, ToolContext, ToolError
 from app.agent.usage import records_from_response
 from app.models import AIUsage, User
 from app.services.ai_settings import model_info
+from app.services.budgets import BudgetExceeded
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ class LoopResult:
     output_tokens: int = 0
     hit_step_limit: bool = False
     refused: bool = False
+    budget_stopped: bool = False
     final_text: str = ""
     proposal_ids: list[int] = field(default_factory=list)
 
@@ -86,6 +89,7 @@ def run_loop(
     run_id: int | None = None,
     max_proposals: int | None = None,
     usage_sink: list[AIUsage] | None = None,
+    budget_check: Callable[[], str | None] | None = None,
 ) -> LoopResult:
     """`usage_sink` collects the ledger rows of every call made, so a caller whose turn fails
     can still record what was billed (see app.agent.usage.persist_after_failure)."""
@@ -94,10 +98,21 @@ def run_loop(
     turn_id = uuid.uuid4().hex
 
     for step in range(max_steps):
+        # checked before every call, so a turn overshoots its budget by at most one call
+        reason = budget_check() if budget_check else None
+        if reason and step == 0:
+            raise BudgetExceeded(reason)
+        if reason:
+            messages.append({"role": "assistant", "content": f"I've had to stop here: {reason}"})
+            result.budget_stopped = True
+            result.final_text = messages[-1]["content"]
+            break
         response = client.beta.messages.create(
             model=model,
             max_tokens=16000,
-            system=system,
+            # an explicit cache point after the static prefix (tools + system), shared by every
+            # chat and deal review; automatic caching below covers the growing conversation
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             tools=TOOL_SPECS,
             messages=messages,
             output_config={"effort": effort},

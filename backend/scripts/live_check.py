@@ -23,7 +23,14 @@ from sqlmodel import Session, col, func, select  # noqa: E402
 from app.agent import copilot  # noqa: E402
 from app.agent.pipeline import review_stalled_deals  # noqa: E402
 from app.core.db import engine  # noqa: E402
-from app.models import AgentConversation, AgentProposal, AIUsage, User  # noqa: E402
+from app.models import (  # noqa: E402
+    AgentConversation,
+    AgentProposal,
+    AgentRun,
+    AIUsage,
+    Deal,
+    User,
+)
 from app.services.ai_settings import get_ai_settings  # noqa: E402
 
 QUESTIONS = [
@@ -127,6 +134,19 @@ def main() -> None:
             summary = review_stalled_deals(session, client, pipeline_model, pipeline_effort)
             print(f"  {summary}")
             rows = session.exec(select(AIUsage).where(col(AIUsage.id) > before)).all()
+            run_ids = {r.run_id for r in rows if r.run_id is not None}
+            for run in session.exec(
+                select(AgentRun).where(col(AgentRun.id).in_(run_ids)).order_by(AgentRun.id)
+            ).all():
+                deal = session.get(Deal, run.deal_id) if run.deal_id else None
+                title = deal.title if deal else "deleted deal"
+                print(f"  {title} ({run.status}): {run.summary or run.error}")
+                for p in session.exec(
+                    select(AgentProposal)
+                    .where(AgentProposal.run_id == run.id)
+                    .order_by(AgentProposal.id)
+                ).all():
+                    print(f"    proposal #{p.id} [{p.status}]: {p.summary}")
             grand += print_usage(list(rows))
 
     print(f"\nTotal: ${grand:.4f} ({plan})")

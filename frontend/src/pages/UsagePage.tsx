@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, CircleAlert } from "lucide-react"
 import { type ReactNode, useState } from "react"
-import { useSearchParams } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 
 import { usageUsageSummaryOptions } from "@/client/@tanstack/react-query.gen"
 import type { UsageSummary } from "@/client/types.gen"
@@ -89,6 +89,7 @@ export function UsagePage() {
           )}
         >
           <Tiles data={data!} />
+          <BudgetLine data={data!} />
           <DailyCard data={data!} />
           <div className="grid gap-6 lg:grid-cols-2">
             <ByFeature data={data!} />
@@ -203,10 +204,11 @@ function ByPerson({ data }: { data: UsageSummary }) {
     <Card className="p-4">
       <h2 className="mb-3 text-sm font-semibold">By person</h2>
       <Table
-        head={["Person", "Copilot", "Questions", "Pipeline agent"]}
+        head={["Person", "Copilot", "Of budget", "Questions", "Pipeline agent"]}
         rows={data.by_user.map((u) => [
           u.user?.name ?? "Deleted user",
           formatUsd(u.copilot_cost_usd),
+          pctOf(u.copilot_cost_usd, data.copilot_budget_per_person_usd),
           formatCount(u.copilot_questions),
           formatUsd(u.pipeline_cost_usd),
         ])}
@@ -216,6 +218,43 @@ function ByPerson({ data }: { data: UsageSummary }) {
         Pipeline agent costs are listed under the deal's owner it worked for.
       </p>
     </Card>
+  )
+}
+
+function pctOf(spent: string | number, budget: string | number | null | undefined) {
+  if (budget == null) return "–"
+  const b = Number(budget)
+  return b > 0 ? `${Math.floor((Number(spent) * 100) / b)}%` : "100%"
+}
+
+/** Budgets apply to the current month only, so this shows nothing for past months. */
+function BudgetLine({ data }: { data: UsageSummary }) {
+  const p = data.pipeline_budget
+  if (!p && data.copilot_budget_per_person_usd == null) return null
+  const high = (p?.used_pct ?? 0) >= 80
+  return (
+    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-soft">
+      {p && (
+        <span
+          className={cn("flex items-center gap-1", high && "text-amber-700 dark:text-amber-400")}
+        >
+          {high && <CircleAlert className="size-4" aria-hidden />}
+          Pipeline agent budget:{" "}
+          {p.budget_usd == null
+            ? `${formatUsd(p.spent_usd)} spent, no limit`
+            : `${formatUsd(p.spent_usd)} of ${formatUsd(p.budget_usd)} (${p.used_pct}%)`}
+        </span>
+      )}
+      <span>
+        Copilot limit:{" "}
+        {data.copilot_budget_per_person_usd == null
+          ? "none"
+          : `${formatUsd(data.copilot_budget_per_person_usd)} per person`}
+      </span>
+      <Link to="/settings" className="text-brand-700 hover:underline">
+        Change budgets
+      </Link>
+    </p>
   )
 }
 

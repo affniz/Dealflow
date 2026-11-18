@@ -41,6 +41,7 @@ def test_not_configured_without_api_key(client, login, monkeypatch):
         "enabled": False,
         "review_hour": 7,
         "timezone": "Asia/Kolkata",
+        "pipeline_budget_reached": None,
     }
     r = _ask(client, h, "hello")
     assert r.status_code == 503 and "ANTHROPIC_API_KEY" in r.json()["detail"]
@@ -305,3 +306,38 @@ def test_deleting_a_deal_fails_its_pending_proposals(client, login, claude, stag
     assert client.delete(f"{API}/deals/{d['id']}", headers=h).status_code == 204
     after = client.get(f"{API}/proposals", headers=h).json()[0]
     assert after["id"] == p["id"] and after["status"] == "failed" and after["deal_id"] is None
+
+
+def test_prompt_versions_stay_fixed_per_conversation(client, login, claude, session, monkeypatch):
+    from app.models import AgentConversation
+
+    h = login(Role.agent)
+    me = client.get(f"{API}/users/me", headers=h).json()
+    claude.script = [say("new"), say("old"), say("still new")]
+
+    # a new chat starts on the current prompt, sent with its own cache point
+    new = _ask(client, h, "hello").json()
+    sent = claude.requests[0]["system"]
+    assert sent == [
+        {"type": "text", "text": copilot.PROMPTS[2], "cache_control": {"type": "ephemeral"}}
+    ]
+    assert "the approval card is the question" in copilot.PROMPTS[2]
+
+    # a chat from before prompts were versioned keeps version 1
+    old = AgentConversation(
+        user_id=me["id"],
+        title="old chat",
+        model="claude-sonnet-5-5",
+        effort="medium",
+        messages=[{"role": "user", "content": "hi"}, {"role": "assistant", "content": "Hello!"}],
+    )
+    session.add(old)
+    session.commit()
+    _ask(client, h, "again", conversation_id=old.id)
+    assert claude.requests[1]["system"][0]["text"] == copilot.PROMPTS[1]
+
+    # adding a newer version later doesn't change a chat already under way
+    monkeypatch.setitem(copilot.PROMPTS, 3, "a future prompt")
+    monkeypatch.setattr(copilot, "CURRENT_PROMPT", 3)
+    _ask(client, h, "and again", conversation_id=new["id"])
+    assert claude.requests[2]["system"][0]["text"] == copilot.PROMPTS[2]

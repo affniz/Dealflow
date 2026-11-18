@@ -64,6 +64,15 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - A Copilot chat keeps the model and effort it started with, so its prompt cache and earlier
   reasoning stay valid; changes apply to new chats and the next pipeline review
 
+**AI budgets**
+- Monthly limits in USD: one per person for the Copilot (default $10) and one for the whole
+  team's pipeline agent (default $20); admins change them in Settings, or set no limit
+- Checked before every model call, so a question or review can go over by at most one call. Past
+  the limit, new Copilot questions are refused with the reset date, an answer in progress stops
+  with a note, and the pipeline agent stops reviewing deals for the month
+- Everyone sees their own spend against their limit in the Copilot panel (highlighted from 80%);
+  the AI usage page shows each budget's use
+
 **AI usage tracking**
 - Every Claude call is recorded with its model, token counts (input, cache reads, cache writes,
   output) and cost in USD from a dated price table (`app/agent/pricing.py`); a call that falls
@@ -90,6 +99,11 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   model's thinking blocks are only valid in an unedited history. The system prompt and tool
   list never change, and per-turn facts (current time, the user, the deal on screen) go in a
   system message after the user's message, so prompt caching keeps working.
+- **Caching**: the tools and system prompt get their own cache point, shared by every chat and
+  deal review; automatic caching covers each conversation's growing history.
+- **Prompt versions**: a chat keeps the Copilot prompt version it started with (like its model),
+  since editing the system prompt of a chat under way would invalidate its earlier reasoning.
+  To change the prompt, add a version in `app/agent/copilot.py`; don't edit an old one.
 - **Safety nets**: a step limit per message, server-side model fallback if a safety classifier
   declines, and a polite reply on refusal.
 - **Pipeline agent** (`app/agent/pipeline.py`) uses the same loop and tools with its own

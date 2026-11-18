@@ -3099,6 +3099,78 @@
         ]
       }
     },
+    "/api/v1/settings/budgets": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Read Budgets",
+        "description": "Monthly AI spending limits in USD; null means no limit.",
+        "operationId": "settings-read_budgets",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Budgets-Output"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Change Budgets",
+        "description": "Replace the limits; send null for no limit. They apply from the next model call.",
+        "operationId": "settings-change_budgets",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Budgets-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Budgets-Output"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -3809,6 +3881,17 @@
           "timezone": {
             "type": "string",
             "title": "Timezone"
+          },
+          "pipeline_budget_reached": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Budget Reached"
           }
         },
         "type": "object",
@@ -3958,6 +4041,111 @@
           "password"
         ],
         "title": "Body_login-login"
+      },
+      "BudgetStatus": {
+        "properties": {
+          "budget_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Usd"
+          },
+          "spent_usd": {
+            "type": "string",
+            "title": "Spent Usd"
+          },
+          "used_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "budget_usd",
+          "spent_usd",
+          "used_pct"
+        ],
+        "title": "BudgetStatus"
+      },
+      "Budgets-Input": {
+        "properties": {
+          "copilot_per_person_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copilot Per Person Usd"
+          },
+          "pipeline_team_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Team Usd"
+          }
+        },
+        "type": "object",
+        "title": "Budgets",
+        "description": "Monthly AI spending limits in USD; None means no limit."
+      },
+      "Budgets-Output": {
+        "properties": {
+          "copilot_per_person_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copilot Per Person Usd"
+          },
+          "pipeline_team_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Team Usd"
+          }
+        },
+        "type": "object",
+        "title": "Budgets",
+        "description": "Monthly AI spending limits in USD; None means no limit."
       },
       "ChatItem": {
         "properties": {
@@ -5352,6 +5540,40 @@
           "questions": {
             "type": "integer",
             "title": "Questions"
+          },
+          "budget_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Usd"
+          },
+          "budget_used_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Used Pct"
+          },
+          "resets_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets On"
           }
         },
         "type": "object",
@@ -5921,6 +6143,27 @@
           "unpriced_calls": {
             "type": "integer",
             "title": "Unpriced Calls"
+          },
+          "copilot_budget_per_person_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copilot Budget Per Person Usd"
+          },
+          "pipeline_budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

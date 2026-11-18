@@ -4,13 +4,16 @@ import { type ReactNode, useState } from "react"
 
 import {
   settingsChangeAiSettingsMutation,
+  settingsChangeBudgetsMutation,
   settingsReadAiSettingsOptions,
+  settingsReadBudgetsOptions,
 } from "@/client/@tanstack/react-query.gen"
-import type { AiSettings, AiSettingsView } from "@/client/types.gen"
+import type { AiSettings, AiSettingsView, BudgetsOutput } from "@/client/types.gen"
 import { PageHeader } from "@/components/layout/AppLayout"
 import { Button } from "@/components/ui/button"
 import { Card, Spinner } from "@/components/ui/card"
-import { Select } from "@/components/ui/field"
+import { Field, Select } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { apiErrorMessage } from "@/lib/api"
 import { useToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -31,6 +34,7 @@ export function SettingsPage() {
         ) : (
           <AiModels view={view.data} key={JSON.stringify(view.data.settings)} />
         )}
+        <BudgetsSection />
       </div>
     </>
   )
@@ -175,5 +179,94 @@ function AgentCard({
         </Select>
       </label>
     </Card>
+  )
+}
+
+function BudgetsSection() {
+  const budgets = useQuery(settingsReadBudgetsOptions())
+  return (
+    <section aria-labelledby="ai-budgets" className="mt-10 space-y-4">
+      <div>
+        <h2 id="ai-budgets" className="text-base font-semibold">
+          AI budgets
+        </h2>
+        <p className="mt-1 text-sm text-ink-soft">
+          Monthly limits in US dollars, as Anthropic bills. They're checked before every model call,
+          so a question or review can go over by at most one call. Leave a limit empty for no limit.
+          Spend so far is on the AI usage page.
+        </p>
+      </div>
+      {budgets.isPending ? (
+        <Spinner />
+      ) : budgets.isError ? (
+        <p className="text-sm text-red-600">Couldn't load budgets.</p>
+      ) : (
+        <BudgetsForm budgets={budgets.data} key={JSON.stringify(budgets.data)} />
+      )}
+    </section>
+  )
+}
+
+const toInput = (v: string | number | null | undefined) => (v == null ? "" : String(Number(v)))
+const toLimit = (v: string) => (v.trim() === "" ? null : v.trim())
+
+function BudgetsForm({ budgets }: { budgets: BudgetsOutput }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const [copilot, setCopilot] = useState(toInput(budgets.copilot_per_person_usd))
+  const [pipeline, setPipeline] = useState(toInput(budgets.pipeline_team_usd))
+  const save = useMutation({
+    ...settingsChangeBudgetsMutation(),
+    onSuccess: (next) => {
+      queryClient.setQueryData(settingsReadBudgetsOptions().queryKey, next)
+      toast("Budgets saved")
+    },
+    onError: (e) => toast(apiErrorMessage(e), "error"),
+  })
+  const dirty =
+    copilot !== toInput(budgets.copilot_per_person_usd) ||
+    pipeline !== toInput(budgets.pipeline_team_usd)
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        save.mutate({
+          body: { copilot_per_person_usd: toLimit(copilot), pipeline_team_usd: toLimit(pipeline) },
+        })
+      }}
+    >
+      <Card className="grid gap-4 p-4 sm:grid-cols-2">
+        <Field label="Copilot, per person per month ($)" htmlFor="budget-copilot">
+          <Input
+            id="budget-copilot"
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            placeholder="No limit"
+            value={copilot}
+            onChange={(e) => setCopilot(e.target.value)}
+          />
+        </Field>
+        <Field label="Pipeline agent, whole team per month ($)" htmlFor="budget-pipeline">
+          <Input
+            id="budget-pipeline"
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            placeholder="No limit"
+            value={pipeline}
+            onChange={(e) => setPipeline(e.target.value)}
+          />
+        </Field>
+      </Card>
+      <div className="mt-4 flex justify-end">
+        <Button type="submit" disabled={!dirty || save.isPending}>
+          {save.isPending ? "Saving…" : "Save budgets"}
+        </Button>
+      </div>
+    </form>
   )
 }

@@ -31,6 +31,7 @@ from app.models import (
     utcnow,
 )
 from app.services.ai_settings import get_ai_settings
+from app.services.budgets import pipeline_block_reason
 
 log = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class ReviewSummary:
     failed: int = 0
     proposals: int = 0
     skipped_reason: str | None = None
+    stopped_by_budget: str | None = None  # why it stopped before reviewing every deal
 
 
 def deals_to_review(session: Session, limit: int) -> list[Deal]:
@@ -148,6 +150,7 @@ def review_deal(
             run_id=run.id,
             max_proposals=MAX_PROPOSALS_PER_DEAL,
             usage_sink=billed,
+            budget_check=lambda: pipeline_block_reason(session),
         )
     except Exception as exc:
         # throw away anything half-done for this deal, keep a record of the failure
@@ -192,6 +195,10 @@ def review_stalled_deals(
             ai = get_ai_settings(session)  # read once, so one run uses one model
             model, effort = model or ai.pipeline_model, effort or ai.pipeline_effort
             for deal in deals_to_review(session, settings.PIPELINE_REVIEW_MAX_DEALS):
+                if (reason := pipeline_block_reason(session)) is not None:
+                    summary.stopped_by_budget = reason
+                    log.warning("Pipeline review stopped: %s", reason)
+                    break
                 run = review_deal(session, client, deal, model, effort)
                 if run.status == RunStatus.failed:
                     summary.failed += 1

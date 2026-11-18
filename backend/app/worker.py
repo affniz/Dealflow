@@ -56,4 +56,5 @@ def pipeline_review_task() -> dict[str, object]:
         "failed": s.failed,
         "proposals": s.proposals,
         "skipped": s.skipped_reason,
+        "stopped_by_budget": s.stopped_by_budget,
     }
