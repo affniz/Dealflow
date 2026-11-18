@@ -30,6 +30,7 @@ from app.models import (
     User,
     utcnow,
 )
+from app.services.ai_settings import get_ai_settings
 
 log = logging.getLogger(__name__)
 
@@ -117,7 +118,9 @@ def _brief(session: Session, deal: Deal, owner: User) -> tuple[str, str]:
     return ask, context
 
 
-def review_deal(session: Session, client: MessagesClient, deal: Deal) -> AgentRun:
+def review_deal(
+    session: Session, client: MessagesClient, deal: Deal, model: str, effort: str
+) -> AgentRun:
     """Review one deal in its own transaction. Failures are recorded, never raised."""
     owner = session.get(User, deal.owner_id)
     assert owner is not None
@@ -132,6 +135,8 @@ def review_deal(session: Session, client: MessagesClient, deal: Deal) -> AgentRu
             session,
             client,
             user=owner,
+            model=model,
+            effort=effort,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": ask}, {"role": "system", "content": context}],
             source="pipeline_agent",
@@ -165,8 +170,15 @@ def review_deal(session: Session, client: MessagesClient, deal: Deal) -> AgentRu
     return run
 
 
-def review_stalled_deals(session: Session, client: MessagesClient) -> ReviewSummary:
-    """The daily job. Holds a database lock so two workers never review at the same time."""
+def review_stalled_deals(
+    session: Session,
+    client: MessagesClient,
+    model: str | None = None,
+    effort: str | None = None,
+) -> ReviewSummary:
+    """The daily job. Holds a database lock so two workers never review at the same time.
+
+    Uses the pipeline agent's model and effort from settings unless given (scripts/evals)."""
     summary = ReviewSummary()
     # the lock belongs to a connection, so hold it on one dedicated connection throughout
     with session.get_bind().engine.connect() as lock_conn:
@@ -174,8 +186,10 @@ def review_stalled_deals(session: Session, client: MessagesClient) -> ReviewSumm
             summary.skipped_reason = "Another pipeline review is already running"
             return summary
         try:
+            ai = get_ai_settings(session)  # read once, so one run uses one model
+            model, effort = model or ai.pipeline_model, effort or ai.pipeline_effort
             for deal in deals_to_review(session, settings.PIPELINE_REVIEW_MAX_DEALS):
-                run = review_deal(session, client, deal)
+                run = review_deal(session, client, deal, model, effort)
                 if run.status == RunStatus.failed:
                     summary.failed += 1
                 else:

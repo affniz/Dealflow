@@ -57,6 +57,13 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   suggestions or a review in the last 3 days are skipped, one failed deal doesn't stop the run,
   and a database lock stops two workers reviewing at once
 
+**AI model settings**
+- Admins choose the Claude model (Opus 5.5, Sonnet 5.5 or Haiku 5.5) and effort for each agent
+  in Settings; both default to Sonnet 5.5 at medium effort (`COPILOT_MODEL`, `PIPELINE_MODEL`,
+  ... in `.env`)
+- A Copilot chat keeps the model and effort it started with, so its prompt cache and earlier
+  reasoning stay valid; changes apply to new chats and the next pipeline review
+
 **AI usage tracking**
 - Every Claude call is recorded with its model, token counts (input, cache reads, cache writes,
   output) and cost in USD from a dated price table (`app/agent/pricing.py`); a call that falls
@@ -132,7 +139,8 @@ or sign in with `ant auth login`, then restart the API. Everything else works wi
 To try the agents against the real models and see what each question costs (on a demo database):
 
 ```bash
-cd backend && uv run python scripts/live_check.py --model claude-sonnet-5-5
+cd backend && uv run python scripts/live_check.py                            # the app's settings
+cd backend && uv run python scripts/live_check.py --model claude-opus-5-5    # try another model
 ```
 
 Open http://localhost:5173 and sign in as `owner@example.com` / `changethis123` (from `.env`) or a

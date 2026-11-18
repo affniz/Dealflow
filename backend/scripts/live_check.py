@@ -5,7 +5,7 @@ answers, the proposals made and the usage per question and model. It writes conv
 proposals and usage rows to the database, so point it at a demo database:
 
     uv run python -m app.initial_data && uv run python -m app.demo_data   # fresh demo DB
-    uv run python scripts/live_check.py                       # model from AGENT_MODEL
+    uv run python scripts/live_check.py                       # models from the app's settings
     uv run python scripts/live_check.py --model claude-sonnet-5-5
 
 Credentials: ANTHROPIC_API_KEY in backend/.env, or your `ant auth login` profile.
@@ -22,9 +22,9 @@ from sqlmodel import Session, col, func, select  # noqa: E402
 
 from app.agent import copilot  # noqa: E402
 from app.agent.pipeline import review_stalled_deals  # noqa: E402
-from app.core.config import settings  # noqa: E402
 from app.core.db import engine  # noqa: E402
 from app.models import AgentConversation, AgentProposal, AIUsage, User  # noqa: E402
+from app.services.ai_settings import get_ai_settings  # noqa: E402
 
 QUESTIONS = [
     "What needs my attention today?",
@@ -52,23 +52,31 @@ def print_usage(rows: list[AIUsage]) -> Decimal:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--model", default=settings.AGENT_MODEL)
-    parser.add_argument("--effort", default=settings.AGENT_EFFORT)
+    parser.add_argument("--model", help="use this model for both agents")
+    parser.add_argument("--effort", help="use this effort for both agents")
     parser.add_argument("--user", default="arjun@dealflow.dev", help="demo user to ask as")
     parser.add_argument("--skip-review", action="store_true", help="only run the Copilot")
     parser.add_argument("--yes", action="store_true", help="don't ask before spending")
     args = parser.parse_args()
 
-    settings.AGENT_MODEL, settings.AGENT_EFFORT = args.model, args.effort
     client = copilot.get_client()
     if client is None:
         sys.exit(
             "No Claude credentials: set ANTHROPIC_API_KEY in backend/.env or run `ant auth login`."
         )
+    with Session(engine) as session:
+        ai = get_ai_settings(session)
+    copilot_model = args.model or ai.copilot_model
+    copilot_effort = args.effort or ai.copilot_effort
+    pipeline_model = args.model or ai.pipeline_model
+    pipeline_effort = args.effort or ai.pipeline_effort
+    plan = (
+        f"Copilot {copilot_model} ({copilot_effort}), "
+        f"pipeline agent {pipeline_model} ({pipeline_effort})"
+    )
     if not args.yes:
         answer = input(
-            f"This makes real API calls on {args.model} (effort {args.effort}); usually well "
-            "under $1 in total. Continue? [y/N] "
+            f"This makes real API calls: {plan}; usually well under $1 in total. Continue? [y/N] "
         )
         if answer.strip().lower() != "y":
             sys.exit("Cancelled.")
@@ -78,7 +86,13 @@ def main() -> None:
         user = session.exec(select(User).where(User.email == args.user)).first()
         if user is None:
             sys.exit(f"No user {args.user}; load the demo data first (python -m app.demo_data).")
-        conv = AgentConversation(user_id=user.id, title="Live check")  # type: ignore[arg-type]
+        # the chosen model is set on the conversation; the app's own settings aren't touched
+        conv = AgentConversation(
+            user_id=user.id,  # type: ignore[arg-type]
+            title="Live check",
+            model=copilot_model,
+            effort=copilot_effort,
+        )
         session.add(conv)
         session.commit()
         session.refresh(conv)
@@ -110,12 +124,12 @@ def main() -> None:
         if not args.skip_review:
             print("\n=== Pipeline review of stalled deals")
             before = session.exec(select(func.max(AIUsage.id))).one() or 0
-            summary = review_stalled_deals(session, client)
+            summary = review_stalled_deals(session, client, pipeline_model, pipeline_effort)
             print(f"  {summary}")
             rows = session.exec(select(AIUsage).where(col(AIUsage.id) > before)).all()
             grand += print_usage(list(rows))
 
-    print(f"\nTotal: ${grand:.4f} on {args.model}")
+    print(f"\nTotal: ${grand:.4f} ({plan})")
 
 
 if __name__ == "__main__":

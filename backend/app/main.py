@@ -12,10 +12,11 @@ from app.api.routes import (
     deals,
     login,
     pipelines,
+    settings,
     usage,
     users,
 )
-from app.core.config import settings
+from app.core.config import settings as config
 
 
 def operation_id(route: APIRoute) -> str:
@@ -25,14 +26,14 @@ def operation_id(route: APIRoute) -> str:
 
 app = FastAPI(
     generate_unique_id_function=operation_id,
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    title=config.PROJECT_NAME,
+    openapi_url=f"{config.API_V1_STR}/openapi.json",
     docs_url="/docs",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,9 +52,10 @@ for module in (
     dashboard,
     copilot,
     usage,
+    settings,
 ):
     api.include_router(module.router)
-app.include_router(api, prefix=settings.API_V1_STR)
+app.include_router(api, prefix=config.API_V1_STR)
 
 
 @app.get("/health", tags=["health"])

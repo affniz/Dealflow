@@ -9,6 +9,7 @@ import {
   copilotReadConversationOptions,
   copilotSendMessageMutation,
   dealsReadDealOptions,
+  settingsReadAiSettingsOptions,
   usageMyUsageOptions,
 } from "@/client/@tanstack/react-query.gen"
 import type { AgentProposalPublic, ConversationView } from "@/client/types.gen"
@@ -57,6 +58,7 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
 
   const status = useQuery({ ...copilotCopilotStatusOptions(), enabled: open })
   const usage = useQuery({ ...usageMyUsageOptions(), enabled: open })
+  const aiSettings = useQuery({ ...settingsReadAiSettingsOptions(), enabled: open })
   const conversations = useQuery({
     ...copilotListConversationsOptions(),
     enabled: open && showHistory,
@@ -128,6 +130,11 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
     }
   }
 
+  // the chat's own model once it has one; otherwise what a new chat will use
+  const modelId = conversation.data?.model ?? aiSettings.data?.settings.copilot_model
+  const modelName =
+    aiSettings.data?.models.find((m) => m.id === modelId)?.name ?? modelId ?? undefined
+
   if (!open) return null
   const proposals = new Map<number, AgentProposalPublic>(
     (conversation.data?.proposals ?? []).map((p) => [p.id, p]),
@@ -142,9 +149,12 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
     >
       <header className="flex items-center gap-2 border-b border-line bg-surface px-3 py-2">
         <Sparkles className="size-4 text-brand-600" aria-hidden />
-        <h2 className="flex-1 truncate text-sm font-semibold">
-          {conversation.data?.title ?? "Copilot"}
-        </h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold">
+            {conversation.data?.title ?? "Copilot"}
+          </h2>
+          {modelName && <p className="truncate text-[11px] text-ink-faint">{modelName}</p>}
+        </div>
         <Button
           variant="ghost"
           size="icon"

@@ -536,6 +536,10 @@ class AgentConversation(SQLModel, table=True):
     messages: list[dict[str, Any]] = Field(
         default_factory=list, sa_column=Column(JSON, nullable=False)
     )
+    # fixed when the chat starts: switching model or effort mid-conversation would lose the
+    # prompt cache and the earlier turns' thinking
+    model: str | None = Field(default=None, max_length=100)
+    effort: str | None = Field(default=None, max_length=10)
     input_tokens: int = 0
     output_tokens: int = 0
     created_at: datetime = Field(default_factory=utcnow)
@@ -642,6 +646,7 @@ class ChatItem(BaseModel):
 class ConversationView(BaseModel):
     id: int
     title: str
+    model: str | None = None
     items: list[ChatItem]
     proposals: list[AgentProposalPublic]
     updated_at: datetime
@@ -721,3 +726,43 @@ class MyUsage(BaseModel):
     month: str
     cost_usd: Decimal
     questions: int
+
+
+class AppSetting(SQLModel, table=True):
+    """Team-wide settings admins change in the app (the environment provides defaults)."""
+
+    key: str = Field(primary_key=True, max_length=100)
+    value: Any = Field(sa_column=Column(JSON, nullable=False))
+    updated_at: datetime = Field(default_factory=utcnow)
+    updated_by_id: int | None = Field(default=None, foreign_key="user.id")
+
+
+EffortLevel = Literal["low", "medium", "high", "xhigh", "max"]
+
+
+class AISettings(BaseModel):
+    copilot_model: str
+    copilot_effort: EffortLevel
+    pipeline_model: str
+    pipeline_effort: EffortLevel
+
+
+class AISettingsUpdate(BaseModel):
+    copilot_model: str | None = None
+    copilot_effort: EffortLevel | None = None
+    pipeline_model: str | None = None
+    pipeline_effort: EffortLevel | None = None
+
+
+class ModelOption(BaseModel):
+    id: str
+    name: str
+    note: str
+    input_usd_per_mtok: Decimal
+    output_usd_per_mtok: Decimal
+
+
+class AISettingsView(BaseModel):
+    settings: AISettings
+    models: list[ModelOption]
+    efforts: list[EffortLevel]

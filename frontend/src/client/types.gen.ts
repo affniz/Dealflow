@@ -5,6 +5,65 @@ export type ClientOptions = {
 };
 
 /**
+ * AISettings
+ */
+export type AiSettings = {
+    /**
+     * Copilot Model
+     */
+    copilot_model: string;
+    /**
+     * Copilot Effort
+     */
+    copilot_effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+    /**
+     * Pipeline Model
+     */
+    pipeline_model: string;
+    /**
+     * Pipeline Effort
+     */
+    pipeline_effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+};
+
+/**
+ * AISettingsUpdate
+ */
+export type AiSettingsUpdate = {
+    /**
+     * Copilot Model
+     */
+    copilot_model?: string | null;
+    /**
+     * Copilot Effort
+     */
+    copilot_effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+    /**
+     * Pipeline Model
+     */
+    pipeline_model?: string | null;
+    /**
+     * Pipeline Effort
+     */
+    pipeline_effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+};
+
+/**
+ * AISettingsView
+ */
+export type AiSettingsView = {
+    settings: AiSettings;
+    /**
+     * Models
+     */
+    models: Array<ModelOption>;
+    /**
+     * Efforts
+     */
+    efforts: Array<'low' | 'medium' | 'high' | 'xhigh' | 'max'>;
+};
+
+/**
  * ActivityCreate
  */
 export type ActivityCreate = {
@@ -640,6 +699,10 @@ export type ConversationView = {
      */
     title: string;
     /**
+     * Model
+     */
+    model?: string | null;
+    /**
      * Items
      */
     items: Array<ChatItem>;
@@ -1068,6 +1131,32 @@ export type Message = {
      * Message
      */
     message: string;
+};
+
+/**
+ * ModelOption
+ */
+export type ModelOption = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Note
+     */
+    note: string;
+    /**
+     * Input Usd Per Mtok
+     */
+    input_usd_per_mtok: string;
+    /**
+     * Output Usd Per Mtok
+     */
+    output_usd_per_mtok: string;
 };
 
 /**
@@ -3530,6 +3619,47 @@ export type UsageUsageSummaryResponses = {
 };
 
 export type UsageUsageSummaryResponse = UsageUsageSummaryResponses[keyof UsageUsageSummaryResponses];
+
+export type SettingsReadAiSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/settings/ai';
+};
+
+export type SettingsReadAiSettingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AiSettingsView;
+};
+
+export type SettingsReadAiSettingsResponse = SettingsReadAiSettingsResponses[keyof SettingsReadAiSettingsResponses];
+
+export type SettingsChangeAiSettingsData = {
+    body: AiSettingsUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/settings/ai';
+};
+
+export type SettingsChangeAiSettingsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SettingsChangeAiSettingsError = SettingsChangeAiSettingsErrors[keyof SettingsChangeAiSettingsErrors];
+
+export type SettingsChangeAiSettingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AiSettingsView;
+};
+
+export type SettingsChangeAiSettingsResponse = SettingsChangeAiSettingsResponses[keyof SettingsChangeAiSettingsResponses];
 
 export type HealthHealthData = {
     body?: never;

@@ -122,6 +122,7 @@ def _view(session: Session, conv: AgentConversation) -> ConversationView:
     return ConversationView(
         id=conv.id,  # type: ignore[arg-type]
         title=conv.title,
+        model=conv.model,
         items=items,
         proposals=_proposals_public(session, list(proposals)),
         updated_at=conv.updated_at,

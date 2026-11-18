@@ -15,6 +15,7 @@ from app.agent.loop import MessagesClient, run_loop
 from app.core.config import settings
 from app.core.time import local
 from app.models import AgentConversation, AIUsage, Deal, Role, User, utcnow
+from app.services.ai_settings import get_ai_settings
 
 log = logging.getLogger(__name__)
 
@@ -100,10 +101,15 @@ def run_turn(
     messages: list[dict[str, Any]] = list(conversation.messages)
     messages.append({"role": "user", "content": text})
     messages.append({"role": "system", "content": _turn_context(session, user, deal_id)})
+    if conversation.model is None:  # first turn: the chat keeps today's settings from now on
+        ai = get_ai_settings(session)
+        conversation.model, conversation.effort = ai.copilot_model, ai.copilot_effort
     result = run_loop(
         session,
         client,
         user=user,
+        model=conversation.model,
+        effort=conversation.effort or "medium",
         system=SYSTEM_PROMPT,
         messages=messages,
         source="copilot",
