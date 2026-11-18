@@ -2913,6 +2913,120 @@
         }
       }
     },
+    "/api/v1/usage/me": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "My Usage",
+        "description": "What the signed-in user's Copilot questions cost this month.",
+        "operationId": "usage-my_usage",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM in the team's time zone; default this month",
+              "title": "Month"
+            },
+            "description": "YYYY-MM in the team's time zone; default this month"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyUsage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/usage/summary": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Usage Summary",
+        "description": "AI spend for the month by feature, model, person and day (admins only).",
+        "operationId": "usage-usage_summary",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM in the team's time zone; default this month",
+              "title": "Month"
+            },
+            "description": "YYYY-MM in the team's time zone; default this month"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -4246,6 +4360,25 @@
         ],
         "title": "CopilotMessageIn"
       },
+      "DailyUsage": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "cost_usd"
+        ],
+        "title": "DailyUsage"
+      },
       "DealCreate": {
         "properties": {
           "title": {
@@ -4689,6 +4822,66 @@
         "type": "object",
         "title": "DealUpdate"
       },
+      "FeatureUsage": {
+        "properties": {
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "cache_read_tokens": {
+            "type": "integer",
+            "title": "Cache Read Tokens"
+          },
+          "cache_write_tokens": {
+            "type": "integer",
+            "title": "Cache Write Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "feature": {
+            "type": "string",
+            "title": "Feature"
+          },
+          "avg_cost_per_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost Per Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cost_usd",
+          "calls",
+          "units",
+          "input_tokens",
+          "cache_read_tokens",
+          "cache_write_tokens",
+          "output_tokens",
+          "feature",
+          "avg_cost_per_unit"
+        ],
+        "title": "FeatureUsage"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4840,6 +5033,77 @@
           "message"
         ],
         "title": "Message"
+      },
+      "ModelUsage": {
+        "properties": {
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "cache_read_tokens": {
+            "type": "integer",
+            "title": "Cache Read Tokens"
+          },
+          "cache_write_tokens": {
+            "type": "integer",
+            "title": "Cache Write Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cost_usd",
+          "calls",
+          "units",
+          "input_tokens",
+          "cache_read_tokens",
+          "cache_write_tokens",
+          "output_tokens",
+          "model"
+        ],
+        "title": "ModelUsage"
+      },
+      "MyUsage": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          },
+          "questions": {
+            "type": "integer",
+            "title": "Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "cost_usd",
+          "questions"
+        ],
+        "title": "MyUsage"
       },
       "NamedRef": {
         "properties": {
@@ -5356,6 +5620,108 @@
         ],
         "title": "Token"
       },
+      "UsageSummary": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "prices_as_of": {
+            "type": "string",
+            "title": "Prices As Of"
+          },
+          "total": {
+            "$ref": "#/components/schemas/UsageTotals"
+          },
+          "by_feature": {
+            "items": {
+              "$ref": "#/components/schemas/FeatureUsage"
+            },
+            "type": "array",
+            "title": "By Feature"
+          },
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsage"
+            },
+            "type": "array",
+            "title": "By Model"
+          },
+          "by_user": {
+            "items": {
+              "$ref": "#/components/schemas/UserUsage"
+            },
+            "type": "array",
+            "title": "By User"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/DailyUsage"
+            },
+            "type": "array",
+            "title": "Daily"
+          },
+          "unpriced_calls": {
+            "type": "integer",
+            "title": "Unpriced Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "prices_as_of",
+          "total",
+          "by_feature",
+          "by_model",
+          "by_user",
+          "daily",
+          "unpriced_calls"
+        ],
+        "title": "UsageSummary"
+      },
+      "UsageTotals": {
+        "properties": {
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "cache_read_tokens": {
+            "type": "integer",
+            "title": "Cache Read Tokens"
+          },
+          "cache_write_tokens": {
+            "type": "integer",
+            "title": "Cache Write Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cost_usd",
+          "calls",
+          "units",
+          "input_tokens",
+          "cache_read_tokens",
+          "cache_write_tokens",
+          "output_tokens"
+        ],
+        "title": "UsageTotals"
+      },
       "UserCreate": {
         "properties": {
           "email": {
@@ -5522,6 +5888,40 @@
         },
         "type": "object",
         "title": "UserUpdateMe"
+      },
+      "UserUsage": {
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "copilot_cost_usd": {
+            "type": "string",
+            "title": "Copilot Cost Usd"
+          },
+          "pipeline_cost_usd": {
+            "type": "string",
+            "title": "Pipeline Cost Usd"
+          },
+          "copilot_questions": {
+            "type": "integer",
+            "title": "Copilot Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user",
+          "copilot_cost_usd",
+          "pipeline_cost_usd",
+          "copilot_questions"
+        ],
+        "title": "UserUsage"
       },
       "ValidationError": {
         "properties": {

@@ -8,6 +8,7 @@ from sqlmodel import Session, col, select
 
 from app.agent import copilot
 from app.agent.proposals import can_decide, decide
+from app.agent.usage import persist_after_failure
 from app.api.access import sees_all
 from app.api.deps import AdminUser, CurrentUser, SessionDep
 from app.core.config import settings
@@ -17,6 +18,7 @@ from app.models import (
     AgentProposalPublic,
     AgentRun,
     AgentRunPublic,
+    AIUsage,
     ChatItem,
     ConversationSummary,
     ConversationView,
@@ -173,10 +175,16 @@ def send_message(
 
     import anthropic
 
+    billed: list[AIUsage] = []
     try:
-        copilot.run_turn(session, client, user, conv, body.text.strip(), body.deal_id)
-    except anthropic.APIError as exc:
+        copilot.run_turn(
+            session, client, user, conv, body.text.strip(), body.deal_id, usage_sink=billed
+        )
+    except Exception as exc:
         session.rollback()
+        persist_after_failure(session, billed)  # calls made before the failure were billed
+        if not isinstance(exc, anthropic.APIError):
+            raise
         log.warning("Copilot call failed: %s", exc)
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, "Copilot couldn't reach Claude just now. Try again."

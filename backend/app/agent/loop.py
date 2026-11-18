@@ -7,6 +7,7 @@ only ever appended to, and is returned exactly as sent to the API.
 
 import json
 import logging
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -15,8 +16,9 @@ from pydantic import ValidationError
 from sqlmodel import Session
 
 from app.agent.tools import TOOL_SPECS, TOOLS_BY_NAME, ToolContext, ToolError
+from app.agent.usage import records_from_response
 from app.core.config import settings
-from app.models import User
+from app.models import AIUsage, User
 
 log = logging.getLogger(__name__)
 
@@ -74,9 +76,13 @@ def run_loop(
     conversation_id: int | None = None,
     run_id: int | None = None,
     max_proposals: int | None = None,
+    usage_sink: list[AIUsage] | None = None,
 ) -> LoopResult:
+    """`usage_sink` collects the ledger rows of every call made, so a caller whose turn fails
+    can still record what was billed (see app.agent.usage.persist_after_failure)."""
     messages = list(messages)
     result = LoopResult(messages=messages)
+    turn_id = uuid.uuid4().hex
 
     for step in range(max_steps):
         response = client.beta.messages.create(
@@ -91,6 +97,17 @@ def run_loop(
             betas=[FALLBACK_BETA],
             fallbacks="default",
         )
+        for row in records_from_response(
+            response,
+            feature=source,
+            user_id=user.id,
+            turn_id=turn_id,
+            conversation_id=conversation_id,
+            run_id=run_id,
+        ):
+            session.add(row)
+            if usage_sink is not None:
+                usage_sink.append(row)
         usage = response.usage
         result.input_tokens += (
             usage.input_tokens

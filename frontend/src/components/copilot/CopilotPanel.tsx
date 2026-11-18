@@ -9,6 +9,7 @@ import {
   copilotReadConversationOptions,
   copilotSendMessageMutation,
   dealsReadDealOptions,
+  usageMyUsageOptions,
 } from "@/client/@tanstack/react-query.gen"
 import type { AgentProposalPublic, ConversationView } from "@/client/types.gen"
 import { RichText } from "@/components/copilot/RichText"
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/card"
 import { apiErrorMessage, invalidate } from "@/lib/api"
 import { permissions, useAuth } from "@/lib/auth"
+import { formatUsd } from "@/lib/money"
 import { readStorage, writeStorage } from "@/lib/storage"
 import { cn } from "@/lib/utils"
 
@@ -54,6 +56,7 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
   })
 
   const status = useQuery({ ...copilotCopilotStatusOptions(), enabled: open })
+  const usage = useQuery({ ...usageMyUsageOptions(), enabled: open })
   const conversations = useQuery({
     ...copilotListConversationsOptions(),
     enabled: open && showHistory,
@@ -81,7 +84,7 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
         view,
       )
       selectConversation(view.id)
-      invalidate(queryClient, "copilotListConversations", "copilotListProposals")
+      invalidate(queryClient, "copilotListConversations", "copilotListProposals", "usageMyUsage")
     },
     onError: (e, vars) => {
       setError(apiErrorMessage(e, "Copilot couldn't answer. Try again."))
@@ -277,6 +280,12 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
         }}
         className="border-t border-line bg-surface p-3"
       >
+        {usage.data && Number(usage.data.cost_usd) > 0 && (
+          <p className="mb-2 text-right text-[11px] text-ink-faint">
+            Your Copilot use this month: {formatUsd(usage.data.cost_usd)} · {usage.data.questions}{" "}
+            {usage.data.questions === 1 ? "question" : "questions"}
+          </p>
+        )}
         {dealId !== null && deal.data && (
           <p className="mb-2 truncate text-xs text-ink-soft">
             Looking at: <span className="font-medium text-ink">{deal.data.title}</span>

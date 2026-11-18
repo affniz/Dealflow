@@ -6,6 +6,7 @@ appended to.
 """
 
 import logging
+import os
 from typing import Any
 
 from sqlmodel import Session
@@ -13,7 +14,7 @@ from sqlmodel import Session
 from app.agent.loop import MessagesClient, run_loop
 from app.core.config import settings
 from app.core.time import local
-from app.models import AgentConversation, Deal, Role, User, utcnow
+from app.models import AgentConversation, AIUsage, Deal, Role, User, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -42,11 +43,31 @@ by name. No preamble.
 
 
 def get_client() -> MessagesClient | None:
-    if not settings.ANTHROPIC_API_KEY:
-        return None
+    """A Claude client, or None when no credentials are configured.
+
+    Uses ANTHROPIC_API_KEY from settings/.env if set; otherwise whatever the SDK finds on its
+    own: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN in the environment, or the profile saved by
+    `ant auth login`.
+    """
     import anthropic
 
-    return anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    if settings.ANTHROPIC_API_KEY:
+        return anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    if _sdk_has_credentials():
+        return anthropic.Anthropic()
+    return None
+
+
+def _sdk_has_credentials() -> bool:
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        return True
+    try:
+        from anthropic.lib.credentials import default_credentials
+
+        return default_credentials() is not None
+    except Exception:  # unreadable profile, older SDK: treat as not configured
+        log.warning("Couldn't check for Anthropic credentials", exc_info=True)
+        return False
 
 
 def _turn_context(session: Session, user: User, deal_id: int | None) -> str:
@@ -74,6 +95,7 @@ def run_turn(
     conversation: AgentConversation,
     text: str,
     deal_id: int | None = None,
+    usage_sink: list[AIUsage] | None = None,
 ) -> None:
     messages: list[dict[str, Any]] = list(conversation.messages)
     messages.append({"role": "user", "content": text})
@@ -89,6 +111,7 @@ def run_turn(
         step_limit_reply="I've run out of steps for this message. Ask me to continue "
         "if you'd like me to keep going.",
         conversation_id=conversation.id,
+        usage_sink=usage_sink,
     )
     conversation.input_tokens += result.input_tokens
     conversation.output_tokens += result.output_tokens

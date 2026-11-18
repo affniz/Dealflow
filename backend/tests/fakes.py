@@ -9,16 +9,24 @@ from anthropic.types.beta import BetaMessage
 Reply = Callable[[dict[str, Any]], dict[str, Any]] | dict[str, Any]
 
 
-def message(content: list[dict[str, Any]], stop_reason: str = "end_turn") -> dict[str, Any]:
+DEFAULT_USAGE = {"input_tokens": 100, "output_tokens": 10, "cache_read_input_tokens": 0}
+
+
+def message(
+    content: list[dict[str, Any]],
+    stop_reason: str = "end_turn",
+    usage: dict[str, Any] | None = None,
+    model: str = "claude-opus-5-5",
+) -> dict[str, Any]:
     return {
         "id": "msg_test",
         "type": "message",
         "role": "assistant",
-        "model": "claude-opus-5-5",
+        "model": model,
         "content": [{"type": "thinking", "thinking": "", "signature": "sig"}, *content],
         "stop_reason": stop_reason,
         "stop_sequence": None,
-        "usage": {"input_tokens": 100, "output_tokens": 10, "cache_read_input_tokens": 0},
+        "usage": usage or DEFAULT_USAGE,
     }
 
 

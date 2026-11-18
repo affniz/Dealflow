@@ -674,6 +674,20 @@ export type CopilotMessageIn = {
 };
 
 /**
+ * DailyUsage
+ */
+export type DailyUsage = {
+    /**
+     * Date
+     */
+    date: string;
+    /**
+     * Cost Usd
+     */
+    cost_usd: string;
+};
+
+/**
  * DealCreate
  */
 export type DealCreate = {
@@ -901,6 +915,48 @@ export type DealUpdate = {
 };
 
 /**
+ * FeatureUsage
+ */
+export type FeatureUsage = {
+    /**
+     * Cost Usd
+     */
+    cost_usd: string;
+    /**
+     * Calls
+     */
+    calls: number;
+    /**
+     * Units
+     */
+    units: number;
+    /**
+     * Input Tokens
+     */
+    input_tokens: number;
+    /**
+     * Cache Read Tokens
+     */
+    cache_read_tokens: number;
+    /**
+     * Cache Write Tokens
+     */
+    cache_write_tokens: number;
+    /**
+     * Output Tokens
+     */
+    output_tokens: number;
+    /**
+     * Feature
+     */
+    feature: string;
+    /**
+     * Avg Cost Per Unit
+     */
+    avg_cost_per_unit: string | null;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -1012,6 +1068,62 @@ export type Message = {
      * Message
      */
     message: string;
+};
+
+/**
+ * ModelUsage
+ */
+export type ModelUsage = {
+    /**
+     * Cost Usd
+     */
+    cost_usd: string;
+    /**
+     * Calls
+     */
+    calls: number;
+    /**
+     * Units
+     */
+    units: number;
+    /**
+     * Input Tokens
+     */
+    input_tokens: number;
+    /**
+     * Cache Read Tokens
+     */
+    cache_read_tokens: number;
+    /**
+     * Cache Write Tokens
+     */
+    cache_write_tokens: number;
+    /**
+     * Output Tokens
+     */
+    output_tokens: number;
+    /**
+     * Model
+     */
+    model: string;
+};
+
+/**
+ * MyUsage
+ */
+export type MyUsage = {
+    /**
+     * Month
+     */
+    month: string;
+    /**
+     * Cost Usd
+     */
+    cost_usd: string;
+    /**
+     * Questions
+     */
+    questions: number;
 };
 
 /**
@@ -1361,6 +1473,75 @@ export type Token = {
 };
 
 /**
+ * UsageSummary
+ */
+export type UsageSummary = {
+    /**
+     * Month
+     */
+    month: string;
+    /**
+     * Prices As Of
+     */
+    prices_as_of: string;
+    total: UsageTotals;
+    /**
+     * By Feature
+     */
+    by_feature: Array<FeatureUsage>;
+    /**
+     * By Model
+     */
+    by_model: Array<ModelUsage>;
+    /**
+     * By User
+     */
+    by_user: Array<UserUsage>;
+    /**
+     * Daily
+     */
+    daily: Array<DailyUsage>;
+    /**
+     * Unpriced Calls
+     */
+    unpriced_calls: number;
+};
+
+/**
+ * UsageTotals
+ */
+export type UsageTotals = {
+    /**
+     * Cost Usd
+     */
+    cost_usd: string;
+    /**
+     * Calls
+     */
+    calls: number;
+    /**
+     * Units
+     */
+    units: number;
+    /**
+     * Input Tokens
+     */
+    input_tokens: number;
+    /**
+     * Cache Read Tokens
+     */
+    cache_read_tokens: number;
+    /**
+     * Cache Write Tokens
+     */
+    cache_write_tokens: number;
+    /**
+     * Output Tokens
+     */
+    output_tokens: number;
+};
+
+/**
  * UserCreate
  */
 export type UserCreate = {
@@ -1456,6 +1637,25 @@ export type UserUpdateMe = {
      * Full Name
      */
     full_name?: string | null;
+};
+
+/**
+ * UserUsage
+ */
+export type UserUsage = {
+    user: NamedRef | null;
+    /**
+     * Copilot Cost Usd
+     */
+    copilot_cost_usd: string;
+    /**
+     * Pipeline Cost Usd
+     */
+    pipeline_cost_usd: string;
+    /**
+     * Copilot Questions
+     */
+    copilot_questions: number;
 };
 
 /**
@@ -3266,6 +3466,70 @@ export type CopilotRejectProposalResponses = {
 };
 
 export type CopilotRejectProposalResponse = CopilotRejectProposalResponses[keyof CopilotRejectProposalResponses];
+
+export type UsageMyUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Month
+         *
+         * YYYY-MM in the team's time zone; default this month
+         */
+        month?: string | null;
+    };
+    url: '/api/v1/usage/me';
+};
+
+export type UsageMyUsageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UsageMyUsageError = UsageMyUsageErrors[keyof UsageMyUsageErrors];
+
+export type UsageMyUsageResponses = {
+    /**
+     * Successful Response
+     */
+    200: MyUsage;
+};
+
+export type UsageMyUsageResponse = UsageMyUsageResponses[keyof UsageMyUsageResponses];
+
+export type UsageUsageSummaryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Month
+         *
+         * YYYY-MM in the team's time zone; default this month
+         */
+        month?: string | null;
+    };
+    url: '/api/v1/usage/summary';
+};
+
+export type UsageUsageSummaryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UsageUsageSummaryError = UsageUsageSummaryErrors[keyof UsageUsageSummaryErrors];
+
+export type UsageUsageSummaryResponses = {
+    /**
+     * Successful Response
+     */
+    200: UsageSummary;
+};
+
+export type UsageUsageSummaryResponse = UsageUsageSummaryResponses[keyof UsageUsageSummaryResponses];
 
 export type HealthHealthData = {
     body?: never;
