@@ -203,6 +203,7 @@ def test_summary(client, login, session, claude):
 
 
 def test_get_client_uses_ant_login_or_env(monkeypatch):
+    monkeypatch.setattr(copilot.settings, "AI_ENABLED", True)  # CI turns it off
     monkeypatch.setattr(copilot.settings, "ANTHROPIC_API_KEY", None)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
@@ -215,3 +216,5 @@ def test_get_client_uses_ant_login_or_env(monkeypatch):
     monkeypatch.setattr(creds, "default_credentials", lambda **_: None)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     assert copilot.get_client() is not None
+    monkeypatch.setattr(copilot.settings, "AI_ENABLED", False)  # off wins over credentials
+    assert copilot.get_client() is None
