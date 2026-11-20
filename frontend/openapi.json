@@ -1194,6 +1194,64 @@
         }
       }
     },
+    "/api/v1/pipelines/{pipeline_id}/stage-order": {
+      "put": {
+        "tags": [
+          "pipelines"
+        ],
+        "summary": "Reorder Stages",
+        "description": "Put the pipeline's stages in this order (positions become 0, 1, 2, ...).",
+        "operationId": "pipelines-reorder_stages",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pipeline_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pipeline Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelinePublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/stages/{stage_id}": {
       "patch": {
         "tags": [
@@ -1650,6 +1708,22 @@
                 }
               ],
               "title": "Company Id"
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
             }
           },
           {
@@ -2572,7 +2646,7 @@
           "dashboard"
         ],
         "summary": "Pipeline Summary",
-        "description": "Per-stage deal counts, totals and probability-weighted forecast (open deals only).",
+        "description": "Per-stage deal counts, totals and probability-weighted forecast (open deals), plus won\nand lost totals and the win rate (all time, or the last `days`).",
         "operationId": "dashboard-pipeline_summary",
         "security": [
           {
@@ -2588,6 +2662,44 @@
               "type": "integer",
               "title": "Pipeline Id"
             }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only deals owned by this user",
+              "title": "Owner Id"
+            },
+            "description": "Only deals owned by this user"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 3650,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Count won and lost deals closed in the last N days",
+              "title": "Days"
+            },
+            "description": "Count won and lost deals closed in the last N days"
           }
         ],
         "responses": {
@@ -2643,6 +2755,24 @@
               ],
               "title": "Pipeline Id"
             }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only deals owned by this user",
+              "title": "Owner Id"
+            },
+            "description": "Only deals owned by this user"
           },
           {
             "name": "days",
@@ -6105,6 +6235,23 @@
             "type": "string",
             "title": "Weighted Value"
           },
+          "rotting_count": {
+            "type": "integer",
+            "title": "Rotting Count",
+            "default": 0
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
           "won_count": {
             "type": "integer",
             "title": "Won Count"
@@ -6116,6 +6263,22 @@
           "lost_count": {
             "type": "integer",
             "title": "Lost Count"
+          },
+          "lost_value": {
+            "type": "string",
+            "title": "Lost Value",
+            "default": "0.00"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate"
           }
         },
         "type": "object",
@@ -6205,6 +6368,24 @@
           "name"
         ],
         "title": "StageCreate"
+      },
+      "StageOrder": {
+        "properties": {
+          "stage_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Stage Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage_ids"
+        ],
+        "title": "StageOrder",
+        "description": "Every stage id of a pipeline, in the order they should appear."
       },
       "StagePublic": {
         "properties": {

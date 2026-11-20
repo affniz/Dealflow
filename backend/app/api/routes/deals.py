@@ -40,6 +40,7 @@ def list_deals(
     deal_status: DealStatus | None = Query(None, alias="status"),
     contact_id: int | None = None,
     company_id: int | None = None,
+    owner_id: int | None = None,
     rotting: bool | None = Query(None, description="Only rotting (true) or fresh (false) deals"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -56,6 +57,7 @@ def list_deals(
         Deal.status: deal_status,
         Deal.contact_id: contact_id,
         Deal.company_id: company_id,
+        Deal.owner_id: owner_id,
     }
     for column, value in filters.items():
         if value is not None:

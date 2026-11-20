@@ -301,6 +301,12 @@ class LostReasonCreate(LostReasonBase):
     pass
 
 
+class StageOrder(SQLModel):
+    """Every stage id of a pipeline, in the order they should appear."""
+
+    stage_ids: list[int] = Field(min_length=1)
+
+
 class LostReasonUpdate(SQLModel):
     label: str = Field(default=None, min_length=1, max_length=100)
     is_active: bool = None
@@ -503,9 +509,14 @@ class PipelineSummary(BaseModel):
     open_count: int
     open_value: Decimal
     weighted_value: Decimal
+    rotting_count: int = 0  # open deals flagged as stalled
+    # won and lost deals: all time, or closed since `since` when a period was asked for
+    since: datetime | None = None
     won_count: int
     won_value: Decimal
     lost_count: int
+    lost_value: Decimal = Decimal("0.00")
+    win_rate: float | None = None  # won / (won + lost), 0..1; None when nothing closed
 
 
 class BoardColumn(BaseModel):
