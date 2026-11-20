@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -26,3 +28,15 @@ def create_access_token(subject: str | int, expires_delta: timedelta | None = No
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     return jwt.encode({"sub": str(subject), "exp": expire}, settings.SECRET_KEY, ALGORITHM)
+
+
+API_TOKEN_PREFIX = "dfp_"  # "Dealflow personal"; makes leaked tokens easy to spot and scan for
+
+
+def generate_api_token() -> str:
+    return API_TOKEN_PREFIX + secrets.token_urlsafe(32)
+
+
+def hash_api_token(token: str) -> str:
+    # tokens are long and random, so a fast hash is enough (unlike passwords)
+    return hashlib.sha256(token.encode()).hexdigest()

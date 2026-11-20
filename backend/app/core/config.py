@@ -36,6 +36,8 @@ class Settings(BaseSettings):
 
     # AI agents (Claude Messages API). Without a key, AI features report they're not set up.
     ANTHROPIC_API_KEY: str | None = None
+    # False turns the AI agents off even if credentials are around (end-to-end tests, CI)
+    AI_ENABLED: bool = True
     # Defaults for each agent; admins can change them in Settings (stored in the database).
     COPILOT_MODEL: str = "claude-sonnet-5-5"
     COPILOT_EFFORT: Effort = "medium"

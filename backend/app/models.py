@@ -132,6 +132,38 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class ApiToken(SQLModel, table=True):
+    """A personal access token, for connecting Claude (or a script) as this person.
+
+    Only a SHA-256 hash is stored; the token itself is shown once, when it's created.
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    name: str = Field(max_length=100)
+    token_hash: str = Field(max_length=64, unique=True)
+    # the first characters, so people can tell their tokens apart
+    prefix: str = Field(max_length=16)
+    created_at: datetime = Field(default_factory=utcnow)
+    last_used_at: datetime | None = None
+
+
+class ApiTokenCreate(SQLModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class ApiTokenPublic(SQLModel):
+    id: int
+    name: str
+    prefix: str
+    created_at: datetime
+    last_used_at: datetime | None
+
+
+class ApiTokenCreated(ApiTokenPublic):
+    token: str = PydField(description="The token itself. It is shown only once.")
+
+
 # ---------------------------------------------------------------- companies
 
 
@@ -623,7 +655,7 @@ class AgentProposal(SQLModel, table=True):
     """A change an agent wants to make. Nothing happens until a person approves it."""
 
     id: int | None = Field(default=None, primary_key=True)
-    source: str = Field(max_length=30)  # "copilot" or "pipeline_agent"
+    source: str = Field(max_length=30)  # "copilot", "pipeline_agent" or "mcp"
     conversation_id: int | None = Field(default=None, foreign_key="agentconversation.id")
     run_id: int | None = Field(default=None, foreign_key="agentrun.id", index=True)
     tool_use_id: str | None = Field(default=None, max_length=100, index=True)

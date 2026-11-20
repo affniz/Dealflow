@@ -25,8 +25,16 @@ export function Dialog({
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
-    if (open && !dialog.open) dialog.showModal()
-    else if (!open && dialog.open) dialog.close()
+    if (open && !dialog.open) {
+      dialog.showModal()
+      // React's autoFocus runs before the dialog opens, so showModal() would focus the close
+      // button and Enter would close the dialog; start in the first field instead
+      dialog
+        .querySelector<HTMLElement>(
+          "input:not([type=hidden]):not(:disabled), select:not(:disabled), textarea:not(:disabled)",
+        )
+        ?.focus()
+    } else if (!open && dialog.open) dialog.close()
   }, [open])
 
   return (

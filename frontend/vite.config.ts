@@ -8,7 +8,10 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   server: {
     // the browser calls /api/...; Vite forwards it to FastAPI, so no CORS setup is needed in dev
-    // (set API_URL to point it at a backend on another port)
-    proxy: { "/api": process.env.API_URL ?? "http://localhost:8000" },
+    // (set API_URL to point it at a backend on another port). /mcp is where Claude connects.
+    proxy: {
+      "/api": process.env.API_URL ?? "http://localhost:8000",
+      "/mcp": process.env.API_URL ?? "http://localhost:8000",
+    },
   },
 })

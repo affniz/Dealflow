@@ -2,6 +2,7 @@ import { Navigate, createBrowserRouter } from "react-router-dom"
 
 import { AppLayout } from "@/components/layout/AppLayout"
 import { RequireAdmin, RequireAuth } from "@/components/RouteGuards"
+import { AccountPage } from "@/pages/AccountPage"
 import { ActivitiesPage } from "@/pages/ActivitiesPage"
 import { BoardPage } from "@/pages/BoardPage"
 import { CompaniesPage } from "@/pages/CompaniesPage"
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { path: "activities", element: <ActivitiesPage /> },
           { path: "dashboard", element: <DashboardPage /> },
           { path: "inbox", element: <InboxPage /> },
+          { path: "account", element: <AccountPage /> },
           {
             element: <RequireAdmin />,
             children: [

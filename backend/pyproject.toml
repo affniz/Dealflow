@@ -13,6 +13,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "celery[redis]>=5.4",
     "anthropic>=2.9.0",
+    "mcp>=2.3",
 ]
 
 [dependency-groups]
