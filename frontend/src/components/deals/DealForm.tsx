@@ -7,10 +7,12 @@ import {
   usersUserDirectoryOptions,
 } from "@/client/@tanstack/react-query.gen"
 import type { NamedRef, StagePublic } from "@/client/types.gen"
+import { CustomFieldsEditor } from "@/components/records/CustomFieldsEditor"
 import { Button } from "@/components/ui/button"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Field, Select } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { type FieldRow, fromFieldRows } from "@/lib/forms"
 
 export type DealFormValues = {
   title: string
@@ -20,6 +22,7 @@ export type DealFormValues = {
   contact_id: number | null
   owner_id: number | null
   expected_close_date: string | null
+  fields: FieldRow[]
 }
 
 const toId = (v: string) => (v ? Number(v) : null)
@@ -47,10 +50,12 @@ export function DealForm({
   busy: boolean
   error: string | null
   submitLabel: string
-  onSubmit: (values: DealFormValues) => void
+  /** Called with the values and the custom fields, once those are valid. */
+  onSubmit: (values: DealFormValues, customFields: Record<string, unknown>) => void
   onCancel: () => void
 }) {
   const [v, setV] = useState(initial)
+  const [fieldsError, setFieldsError] = useState<string | null>(null)
   const companies = useQuery(companiesListCompaniesOptions({ query: { limit: 200 } }))
   const contacts = useQuery(contactsListContactsOptions({ query: { limit: 200 } }))
   const directory = useQuery({ ...usersUserDirectoryOptions(), enabled: canAssign })
@@ -71,7 +76,9 @@ export function DealForm({
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    onSubmit(v)
+    const custom = fromFieldRows(v.fields)
+    setFieldsError(custom.error)
+    if (!custom.error) onSubmit(v, custom.fields)
   }
 
   return (
@@ -179,9 +186,10 @@ export function DealForm({
           </Select>
         </Field>
       )}
-      {error && (
+      <CustomFieldsEditor rows={v.fields} onChange={(fields) => setV({ ...v, fields })} />
+      {(fieldsError ?? error) && (
         <p role="alert" className="text-sm text-red-600">
-          {error}
+          {fieldsError ?? error}
         </p>
       )}
       <DialogFooter>

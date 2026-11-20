@@ -6,37 +6,21 @@ import {
   CircleCheck,
   CircleX,
   Flame,
-  Mail,
-  NotebookPen,
   PencilLine,
-  Phone,
   Plus,
   RotateCcw,
   Sparkles,
-  SquareCheck,
-  Users,
 } from "lucide-react"
-import type { ReactNode } from "react"
+import { type ReactNode, useState } from "react"
 
 import { activitiesUpdateActivityMutation } from "@/client/@tanstack/react-query.gen"
-import type {
-  ActivityPublic,
-  ActivityType,
-  DealEventPublic,
-  TimelineItem,
-} from "@/client/types.gen"
+import type { ActivityPublic, DealEventPublic, TimelineItem } from "@/client/types.gen"
+import { ActivitySheet } from "@/components/activities/ActivitySheet"
+import { ACTIVITY_ICONS } from "@/lib/activities"
 import { DEAL_QUERIES, apiErrorMessage, invalidate } from "@/lib/api"
 import { useNow } from "@/lib/time"
 import { useToast } from "@/lib/toast"
 import { cn, formatMoney, timeAgo } from "@/lib/utils"
-
-const ACTIVITY_ICONS: Record<ActivityType, typeof Phone> = {
-  call: Phone,
-  meeting: Users,
-  task: SquareCheck,
-  email: Mail,
-  note: NotebookPen,
-}
 
 const FIELD_LABELS: Record<string, string> = {
   expected_close_date: "expected close date",
@@ -55,27 +39,36 @@ export function Timeline({
   stageName: (id: unknown) => string
   canWrite: boolean
 }) {
+  const [editing, setEditing] = useState<ActivityPublic | null>(null)
   if (items.length === 0) return <p className="text-sm text-ink-faint">Nothing here yet.</p>
   return (
-    <ol className="relative space-y-5 before:absolute before:top-2 before:bottom-2 before:left-4 before:w-px before:bg-line">
-      {items.map((item) =>
-        item.kind === "event" && item.event ? (
-          <EventRow
-            key={`e${item.event.id}`}
-            event={item.event}
-            actor={item.actor?.name}
-            stageName={stageName}
-          />
-        ) : item.activity ? (
-          <ActivityRow
-            key={`a${item.activity.id}`}
-            activity={item.activity}
-            actor={item.actor?.name}
-            canWrite={canWrite}
-          />
-        ) : null,
-      )}
-    </ol>
+    <>
+      <ol className="relative space-y-5 before:absolute before:top-2 before:bottom-2 before:left-4 before:w-px before:bg-line">
+        {items.map((item) =>
+          item.kind === "event" && item.event ? (
+            <EventRow
+              key={`e${item.event.id}`}
+              event={item.event}
+              actor={item.actor?.name}
+              stageName={stageName}
+            />
+          ) : item.activity ? (
+            <ActivityRow
+              key={`a${item.activity.id}`}
+              activity={item.activity}
+              actor={item.actor?.name}
+              canWrite={canWrite}
+              onOpen={setEditing}
+            />
+          ) : null,
+        )}
+      </ol>
+      <ActivitySheet
+        open={editing !== null}
+        activity={editing ?? undefined}
+        onClose={() => setEditing(null)}
+      />
+    </>
   )
 }
 
@@ -210,10 +203,12 @@ function ActivityRow({
   activity,
   actor,
   canWrite,
+  onOpen,
 }: {
   activity: ActivityPublic
   actor?: string
   canWrite: boolean
+  onOpen: (activity: ActivityPublic) => void
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -225,9 +220,11 @@ function ActivityRow({
   })
   const now = useNow()
   const overdue = !activity.done && activity.due_at && new Date(activity.due_at).getTime() < now
-  // tasks and scheduled meetings can be ticked off; logged calls and notes already happened
+  // the same rule as ActivityItem: to-dos and anything scheduled can be ticked off; logged
+  // calls and meetings and notes already happened
   const checkable =
-    activity.type === "task" || (activity.type === "meeting" && Boolean(activity.due_at))
+    activity.type !== "note" &&
+    (!activity.done || activity.type === "task" || Boolean(activity.due_at))
 
   return (
     <Row icon={<Icon />}>
@@ -249,14 +246,17 @@ function ActivityRow({
             />
           )}
           <div className="min-w-0 flex-1">
-            <p
+            <button
+              type="button"
+              disabled={!canWrite}
+              onClick={() => onOpen(activity)}
               className={cn(
-                "text-sm font-medium",
+                "text-left text-sm font-medium enabled:hover:text-brand-700 enabled:hover:underline",
                 activity.done && checkable && "text-ink-soft line-through",
               )}
             >
               {activity.subject}
-            </p>
+            </button>
             {activity.body && (
               <p className="mt-1 text-sm whitespace-pre-line text-ink-soft">{activity.body}</p>
             )}

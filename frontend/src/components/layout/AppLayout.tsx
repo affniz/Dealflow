@@ -25,8 +25,8 @@ import { cn, initials } from "@/lib/utils"
 
 const NAV = [
   { to: "/", label: "Pipeline", icon: SquareKanban, end: true, alsoActive: "/deals/" },
-  { to: "/contacts", label: "Contacts", icon: Users },
-  { to: "/companies", label: "Companies", icon: Building2 },
+  { to: "/contacts", label: "Contacts", icon: Users, alsoActive: "/contacts/" },
+  { to: "/companies", label: "Companies", icon: Building2, alsoActive: "/companies/" },
   { to: "/activities", label: "My activities", icon: ListChecks },
   { to: "/dashboard", label: "Dashboard", icon: ChartColumn },
   { to: "/inbox", label: "Agent inbox", icon: Inbox },

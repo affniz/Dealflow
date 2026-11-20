@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type FormEvent, useState } from "react"
 
 import { activitiesCreateActivityMutation } from "@/client/@tanstack/react-query.gen"
-import type { ActivityType, DealPublic } from "@/client/types.gen"
+import type { ActivityType } from "@/client/types.gen"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -17,8 +17,14 @@ const TYPES: { value: ActivityType; label: string }[] = [
   { value: "task", label: "Task" },
 ]
 
-/** Log a note, call or meeting, or schedule a task, on a deal. */
-export function ActivityComposer({ deal }: { deal: DealPublic }) {
+export type ActivityLinks = {
+  deal_id?: number | null
+  contact_id?: number | null
+  company_id?: number | null
+}
+
+/** Log a note, call or meeting, or schedule a task, on a deal, contact or company. */
+export function ActivityComposer({ links }: { links: ActivityLinks }) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const [type, setType] = useState<ActivityType>("note")
@@ -52,9 +58,9 @@ export function ActivityComposer({ deal }: { deal: DealPublic }) {
         due_at: schedulable && due ? new Date(due).toISOString() : null,
         // logging a call or meeting records something that already happened
         done: type === "call" || (type === "meeting" && !due),
-        deal_id: deal.id,
-        contact_id: deal.contact_id,
-        company_id: deal.company_id,
+        deal_id: links.deal_id ?? null,
+        contact_id: links.contact_id ?? null,
+        company_id: links.company_id ?? null,
       },
     })
   }

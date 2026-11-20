@@ -33,3 +33,12 @@ export const DEAL_QUERIES = [
   "dashboardLostReasons",
   "copilotListProposals",
 ]
+
+/** Everything that shows contacts or companies (deals show their names too). */
+export const RECORD_QUERIES = [
+  "contactsListContacts",
+  "contactsReadContact",
+  "companiesListCompanies",
+  "companiesReadCompany",
+  ...DEAL_QUERIES,
+]
