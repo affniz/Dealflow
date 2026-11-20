@@ -381,10 +381,42 @@
                   "type": "null"
                 }
               ],
-              "description": "Search name or domain",
+              "description": "Search name, domain or industry",
               "title": "Q"
             },
-            "description": "Search name or domain"
+            "description": "Search name, domain or industry"
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "name",
+                "recent"
+              ],
+              "type": "string",
+              "description": "Name, or recently updated",
+              "default": "name",
+              "title": "Sort"
+            },
+            "description": "Name, or recently updated"
           },
           {
             "name": "skip",
@@ -644,10 +676,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Search name, email or phone",
+              "description": "Search name, email, phone or company name",
               "title": "Q"
             },
-            "description": "Search name, email or phone"
+            "description": "Search name, email, phone or company name"
           },
           {
             "name": "company_id",
@@ -664,6 +696,38 @@
               ],
               "title": "Company Id"
             }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "name",
+                "recent"
+              ],
+              "type": "string",
+              "description": "Name, or recently updated",
+              "default": "name",
+              "title": "Sort"
+            },
+            "description": "Name, or recently updated"
           },
           {
             "name": "skip",
@@ -2103,6 +2167,22 @@
             }
           },
           {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
+            }
+          },
+          {
             "name": "type",
             "in": "query",
             "required": false,
@@ -2145,6 +2225,114 @@
               "title": "Overdue"
             },
             "description": "Only open activities past their due time"
+          },
+          {
+            "name": "todo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true: open calls, meetings, tasks and emails (notes are never to-dos); false: everything else (done items and notes)",
+              "title": "Todo"
+            },
+            "description": "true: open calls, meetings, tasks and emails (notes are never to-dos); false: everything else (done items and notes)"
+          },
+          {
+            "name": "due_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Due at or after this time",
+              "title": "Due After"
+            },
+            "description": "Due at or after this time"
+          },
+          {
+            "name": "due_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Due before this time",
+              "title": "Due Before"
+            },
+            "description": "Due before this time"
+          },
+          {
+            "name": "has_due",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "With (true) or without (false) a due time",
+              "title": "Has Due"
+            },
+            "description": "With (true) or without (false) a due time"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search subject and details",
+              "title": "Q"
+            },
+            "description": "Search subject and details"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "due",
+                "recent"
+              ],
+              "type": "string",
+              "description": "due: soonest first, undated last; recent: last done or added first",
+              "default": "due",
+              "title": "Sort"
+            },
+            "description": "due: soonest first, undated last; recent: last done or added first"
           },
           {
             "name": "skip",
@@ -3542,6 +3730,46 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4314,6 +4542,31 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contact_count": {
+            "type": "integer",
+            "title": "Contact Count",
+            "default": 0
+          },
+          "open_deal_count": {
+            "type": "integer",
+            "title": "Open Deal Count",
+            "default": 0
+          },
+          "open_deal_value": {
+            "type": "string",
+            "title": "Open Deal Value",
+            "default": "0"
           }
         },
         "type": "object",
@@ -4565,6 +4818,31 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "open_deal_count": {
+            "type": "integer",
+            "title": "Open Deal Count",
+            "default": 0
           }
         },
         "type": "object",

@@ -17,7 +17,7 @@ import {
 } from "@/client/@tanstack/react-query.gen"
 import type { DealPublic, DealUpdate } from "@/client/types.gen"
 import { ProposalCard } from "@/components/copilot/ProposalCard"
-import { ActivityComposer } from "@/components/deals/ActivityComposer"
+import { ActivityComposer } from "@/components/activities/ActivityComposer"
 import { DealForm } from "@/components/deals/DealForm"
 import { StageBar } from "@/components/deals/StageBar"
 import { Timeline } from "@/components/deals/Timeline"
@@ -26,6 +26,7 @@ import { Badge, Card, Spinner } from "@/components/ui/card"
 import { Dialog, DialogFooter } from "@/components/ui/dialog"
 import { Field, Select, Textarea } from "@/components/ui/field"
 import { DEAL_QUERIES, apiErrorMessage, invalidate } from "@/lib/api"
+import { same, toFieldRows } from "@/lib/forms"
 import { permissions, useAuth } from "@/lib/auth"
 import { useNow } from "@/lib/time"
 import { useToast } from "@/lib/toast"
@@ -177,7 +178,11 @@ export function DealPage() {
               ))}
             </div>
           )}
-          {canWrite && <ActivityComposer deal={d} />}
+          {canWrite && (
+            <ActivityComposer
+              links={{ deal_id: d.id, contact_id: d.contact_id, company_id: d.company_id }}
+            />
+          )}
           <h2 className="text-sm font-semibold">Timeline</h2>
           {timeline.isPending ? (
             <Spinner />
@@ -269,13 +274,14 @@ function EditDealDialog({
           contact_id: deal.contact_id ?? null,
           owner_id: deal.owner_id,
           expected_close_date: deal.expected_close_date ?? null,
+          fields: toFieldRows(deal.custom_fields),
         }}
         canAssign={canAssign}
         busy={update.isPending}
         error={error}
         submitLabel="Save"
         onCancel={onClose}
-        onSubmit={(v) => {
+        onSubmit={(v, customFields) => {
           setError(null)
           // PATCH only what changed, so untouched links aren't re-validated
           const next: DealUpdate = {
@@ -298,6 +304,7 @@ function EditDealDialog({
               k === "value" ? Number(val) !== Number(current.value) : val !== current[k],
             ),
           ) as DealUpdate
+          if (!same(customFields, deal.custom_fields ?? {})) body.custom_fields = customFields
           if (Object.keys(body).length === 0) return onClose()
           update.mutate({ path: { deal_id: deal.id }, body })
         }}

@@ -44,6 +44,13 @@ class Page(BaseModel, Generic[T]):
     count: int
 
 
+class NamedRef(BaseModel):
+    """A linked record's id and display name, so clients don't need extra lookups."""
+
+    id: int
+    name: str
+
+
 class Message(BaseModel):
     message: str
 
@@ -164,6 +171,13 @@ class CompanyPublic(CompanyBase):
     created_at: datetime
     updated_at: datetime
 
+    # filled in by app.services.names.with_company_details; counts only cover records the
+    # reader can see
+    owner: NamedRef | None = None
+    contact_count: int = 0
+    open_deal_count: int = 0
+    open_deal_value: Decimal = Decimal("0")
+
 
 # ---------------------------------------------------------------- contacts
 
@@ -207,6 +221,11 @@ class ContactPublic(ContactBase):
     custom_fields: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+    # filled in by app.services.names.with_contact_details
+    owner: NamedRef | None = None
+    company: NamedRef | None = None
+    open_deal_count: int = 0
 
 
 # ---------------------------------------------------------------- pipelines
@@ -344,13 +363,6 @@ class DealLost(SQLModel):
     note: str | None = Field(default=None, max_length=2000)
 
 
-class NamedRef(BaseModel):
-    """A linked record's id and display name, so clients don't need extra lookups."""
-
-    id: int
-    name: str
-
-
 class DealPublic(DealBase):
     id: int
     pipeline_id: int
@@ -455,6 +467,12 @@ class ActivityPublic(ActivityBase):
     done_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+    # filled in by app.services.names.with_activity_names
+    owner: NamedRef | None = None
+    deal: NamedRef | None = None
+    contact: NamedRef | None = None
+    company: NamedRef | None = None
 
 
 # ---------------------------------------------------------------- timeline & dashboard

@@ -159,6 +159,10 @@ export type ActivityPublic = {
      * Updated At
      */
     updated_at: string;
+    owner?: NamedRef | null;
+    deal?: NamedRef | null;
+    contact?: NamedRef | null;
+    company?: NamedRef | null;
 };
 
 /**
@@ -556,6 +560,19 @@ export type CompanyPublic = {
      * Updated At
      */
     updated_at: string;
+    owner?: NamedRef | null;
+    /**
+     * Contact Count
+     */
+    contact_count?: number;
+    /**
+     * Open Deal Count
+     */
+    open_deal_count?: number;
+    /**
+     * Open Deal Value
+     */
+    open_deal_value?: string;
 };
 
 /**
@@ -680,6 +697,12 @@ export type ContactPublic = {
      * Updated At
      */
     updated_at: string;
+    owner?: NamedRef | null;
+    company?: NamedRef | null;
+    /**
+     * Open Deal Count
+     */
+    open_deal_count?: number;
 };
 
 /**
@@ -2206,9 +2229,19 @@ export type CompaniesListCompaniesData = {
         /**
          * Q
          *
-         * Search name or domain
+         * Search name, domain or industry
          */
         q?: string | null;
+        /**
+         * Owner Id
+         */
+        owner_id?: number | null;
+        /**
+         * Sort
+         *
+         * Name, or recently updated
+         */
+        sort?: 'name' | 'recent';
         /**
          * Skip
          */
@@ -2361,13 +2394,23 @@ export type ContactsListContactsData = {
         /**
          * Q
          *
-         * Search name, email or phone
+         * Search name, email, phone or company name
          */
         q?: string | null;
         /**
          * Company Id
          */
         company_id?: number | null;
+        /**
+         * Owner Id
+         */
+        owner_id?: number | null;
+        /**
+         * Sort
+         *
+         * Name, or recently updated
+         */
+        sort?: 'name' | 'recent';
         /**
          * Skip
          */
@@ -3160,6 +3203,10 @@ export type ActivitiesListActivitiesData = {
          */
         company_id?: number | null;
         /**
+         * Owner Id
+         */
+        owner_id?: number | null;
+        /**
          * Type
          */
         type?: ActivityType | null;
@@ -3173,6 +3220,42 @@ export type ActivitiesListActivitiesData = {
          * Only open activities past their due time
          */
         overdue?: boolean;
+        /**
+         * Todo
+         *
+         * true: open calls, meetings, tasks and emails (notes are never to-dos); false: everything else (done items and notes)
+         */
+        todo?: boolean | null;
+        /**
+         * Due After
+         *
+         * Due at or after this time
+         */
+        due_after?: string | null;
+        /**
+         * Due Before
+         *
+         * Due before this time
+         */
+        due_before?: string | null;
+        /**
+         * Has Due
+         *
+         * With (true) or without (false) a due time
+         */
+        has_due?: boolean | null;
+        /**
+         * Q
+         *
+         * Search subject and details
+         */
+        q?: string | null;
+        /**
+         * Sort
+         *
+         * due: soonest first, undated last; recent: last done or added first
+         */
+        sort?: 'due' | 'recent';
         /**
          * Skip
          */

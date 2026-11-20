@@ -1,5 +1,9 @@
+from datetime import datetime
+from typing import Literal
+
 from fastapi import APIRouter, Query, Response, status
-from sqlmodel import col, select
+from sqlalchemy import func
+from sqlmodel import col, or_, select
 
 from app.api.access import (
     get_visible,
@@ -14,9 +18,11 @@ from app.models import (
     ActivityType,
     ActivityUpdate,
     Page,
+    to_utc,
     utcnow,
 )
 from app.services import actions
+from app.services.names import with_activity_names
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -28,9 +34,22 @@ def list_activities(
     deal_id: int | None = None,
     contact_id: int | None = None,
     company_id: int | None = None,
+    owner_id: int | None = None,
     type: ActivityType | None = None,
     done: bool | None = None,
     overdue: bool = Query(False, description="Only open activities past their due time"),
+    todo: bool | None = Query(
+        None,
+        description="true: open calls, meetings, tasks and emails (notes are never to-dos); "
+        "false: everything else (done items and notes)",
+    ),
+    due_after: datetime | None = Query(None, description="Due at or after this time"),
+    due_before: datetime | None = Query(None, description="Due before this time"),
+    has_due: bool | None = Query(None, description="With (true) or without (false) a due time"),
+    q: str | None = Query(None, description="Search subject and details"),
+    sort: Literal["due", "recent"] = Query(
+        "due", description="due: soonest first, undated last; recent: last done or added first"
+    ),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ) -> Page[ActivityPublic]:
@@ -39,16 +58,36 @@ def list_activities(
         Activity.deal_id: deal_id,
         Activity.contact_id: contact_id,
         Activity.company_id: company_id,
+        Activity.owner_id: owner_id,
         Activity.type: type,
         Activity.done: done,
     }
     for column, value in filters.items():
         if value is not None:
             stmt = stmt.where(column == value)
+    due = col(Activity.due_at)
     if overdue:
-        stmt = stmt.where(col(Activity.done).is_(False), col(Activity.due_at) < utcnow())
-    stmt = stmt.order_by(col(Activity.due_at).is_(None), col(Activity.due_at), col(Activity.id))
-    return paginate(session, stmt, ActivityPublic, skip, limit)
+        stmt = stmt.where(col(Activity.done).is_(False), due < utcnow())
+    if todo is not None:
+        is_todo = (col(Activity.done).is_(False)) & (col(Activity.type) != ActivityType.note)
+        stmt = stmt.where(is_todo if todo else ~is_todo)
+    if due_after is not None:
+        stmt = stmt.where(due >= to_utc(due_after))
+    if due_before is not None:
+        stmt = stmt.where(due < to_utc(due_before))
+    if has_due is not None:
+        stmt = stmt.where(due.is_not(None) if has_due else due.is_(None))
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(col(Activity.subject).ilike(like), col(Activity.body).ilike(like)))
+    if sort == "recent":
+        happened = func.coalesce(Activity.done_at, Activity.created_at)
+        stmt = stmt.order_by(happened.desc(), col(Activity.id).desc())
+    else:
+        stmt = stmt.order_by(due.is_(None), due, col(Activity.id))
+    page = paginate(session, stmt, ActivityPublic, skip, limit)
+    with_activity_names(session, page.data)
+    return page
 
 
 @router.post("", response_model=ActivityPublic, status_code=status.HTTP_201_CREATED)

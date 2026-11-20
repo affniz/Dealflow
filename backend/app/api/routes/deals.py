@@ -25,7 +25,7 @@ from app.models import (
     TimelineItem,
 )
 from app.services import actions
-from app.services.names import deal_public, user_refs, with_deal_names
+from app.services.names import deal_public, user_refs, with_activity_names, with_deal_names
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
@@ -129,6 +129,8 @@ def deal_timeline(session: SessionDep, user: CurrentUser, deal_id: int) -> list[
     events = session.exec(select(DealEvent).where(DealEvent.deal_id == deal_id)).all()
     activities = session.exec(select(Activity).where(Activity.deal_id == deal_id)).all()
     names = user_refs(session, [e.actor_id for e in events] + [a.owner_id for a in activities])
+    # linked names too, so the activity can be opened for editing as it is everywhere else
+    publics = with_activity_names(session, [ActivityPublic.model_validate(a) for a in activities])
     items = [
         TimelineItem(
             kind="event",
@@ -141,9 +143,9 @@ def deal_timeline(session: SessionDep, user: CurrentUser, deal_id: int) -> list[
         TimelineItem(
             kind="activity",
             at=a.created_at,
-            activity=ActivityPublic.model_validate(a),
+            activity=a,
             actor=names.get(a.owner_id),
         )
-        for a in activities
+        for a in publics
     ]
     return sorted(items, key=lambda i: i.at, reverse=True)

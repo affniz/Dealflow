@@ -230,6 +230,8 @@ def test_inbox_endpoints(client, login, session, claude, team, monkeypatch):
 
     # starting a review: admins only, needs AI configured and a reachable worker
     assert client.post(f"{API}/agent/pipeline-review", headers=team["alice"]).status_code == 403
+    # no client, even on a machine where the SDK would find an `ant` login
+    app.dependency_overrides[copilot.get_client] = lambda: None
     assert client.post(f"{API}/agent/pipeline-review", headers=admin).status_code == 503
     app.dependency_overrides[copilot.get_client] = lambda: claude
     queued = []

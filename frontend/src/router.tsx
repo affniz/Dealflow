@@ -2,7 +2,12 @@ import { Navigate, createBrowserRouter } from "react-router-dom"
 
 import { AppLayout } from "@/components/layout/AppLayout"
 import { RequireAdmin, RequireAuth } from "@/components/RouteGuards"
+import { ActivitiesPage } from "@/pages/ActivitiesPage"
 import { BoardPage } from "@/pages/BoardPage"
+import { CompaniesPage } from "@/pages/CompaniesPage"
+import { CompanyPage } from "@/pages/CompanyPage"
+import { ContactPage } from "@/pages/ContactPage"
+import { ContactsPage } from "@/pages/ContactsPage"
 import { DealPage } from "@/pages/DealPage"
 import { InboxPage } from "@/pages/InboxPage"
 import { SettingsPage } from "@/pages/SettingsPage"
@@ -20,9 +25,11 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <BoardPage /> },
           { path: "deals/:dealId", element: <DealPage /> },
-          { path: "contacts", element: <PlaceholderPage title="Contacts" milestone="3e" /> },
-          { path: "companies", element: <PlaceholderPage title="Companies" milestone="3e" /> },
-          { path: "activities", element: <PlaceholderPage title="My activities" milestone="3e" /> },
+          { path: "contacts", element: <ContactsPage /> },
+          { path: "contacts/:contactId", element: <ContactPage /> },
+          { path: "companies", element: <CompaniesPage /> },
+          { path: "companies/:companyId", element: <CompanyPage /> },
+          { path: "activities", element: <ActivitiesPage /> },
           { path: "dashboard", element: <PlaceholderPage title="Dashboard" milestone="3f" /> },
           { path: "inbox", element: <InboxPage /> },
           {

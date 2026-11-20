@@ -35,6 +35,13 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   "My deals" and "Stalled only" filters; add a deal from the board
 - **Deal page**: clickable stage bar; Won, Lost (with a reason), Reopen, Edit and Delete; the
   deal's timeline of changes and activities; log a note, call or meeting, or schedule a task
+- **Contacts and companies**: searchable, sortable lists (search covers full names, email, phone
+  and company name; admins can filter by owner), kept in the URL so they survive reloads and
+  links. Each record has a page with its activities (to-dos first, then history), deals, people
+  (for a company) and details, and is added or edited in a side panel without leaving the page
+- **My activities**: open tasks, calls, meetings and emails grouped into Overdue, Today (in your
+  own time zone), Upcoming and No due date; a "Done & notes" history; tick things off, edit them
+  in a side panel, or add one linked to a deal, contact and company
 - Sign-in and role-aware screens: viewers get no edit controls, agents see only their own deals;
   works on phones and follows the system light/dark setting
 
