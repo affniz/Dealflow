@@ -332,6 +332,74 @@ export type AgentStatus = {
 };
 
 /**
+ * ApiTokenCreate
+ */
+export type ApiTokenCreate = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * ApiTokenCreated
+ */
+export type ApiTokenCreated = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Prefix
+     */
+    prefix: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+    /**
+     * Token
+     *
+     * The token itself. It is shown only once.
+     */
+    token: string;
+};
+
+/**
+ * ApiTokenPublic
+ */
+export type ApiTokenPublic = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Prefix
+     */
+    prefix: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+};
+
+/**
  * Board
  */
 export type Board = {
@@ -2249,6 +2317,79 @@ export type UsersUpdateUserResponses = {
 };
 
 export type UsersUpdateUserResponse = UsersUpdateUserResponses[keyof UsersUpdateUserResponses];
+
+export type TokensListTokensData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/tokens';
+};
+
+export type TokensListTokensResponses = {
+    /**
+     * Response Tokens-List Tokens
+     *
+     * Successful Response
+     */
+    200: Array<ApiTokenPublic>;
+};
+
+export type TokensListTokensResponse = TokensListTokensResponses[keyof TokensListTokensResponses];
+
+export type TokensCreateTokenData = {
+    body: ApiTokenCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/tokens';
+};
+
+export type TokensCreateTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TokensCreateTokenError = TokensCreateTokenErrors[keyof TokensCreateTokenErrors];
+
+export type TokensCreateTokenResponses = {
+    /**
+     * Successful Response
+     */
+    201: ApiTokenCreated;
+};
+
+export type TokensCreateTokenResponse = TokensCreateTokenResponses[keyof TokensCreateTokenResponses];
+
+export type TokensRevokeTokenData = {
+    body?: never;
+    path: {
+        /**
+         * Token Id
+         */
+        token_id: number;
+    };
+    query?: never;
+    url: '/api/v1/users/me/tokens/{token_id}';
+};
+
+export type TokensRevokeTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TokensRevokeTokenError = TokensRevokeTokenErrors[keyof TokensRevokeTokenErrors];
+
+export type TokensRevokeTokenResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type TokensRevokeTokenResponse = TokensRevokeTokenResponses[keyof TokensRevokeTokenResponses];
 
 export type CompaniesListCompaniesData = {
     body?: never;

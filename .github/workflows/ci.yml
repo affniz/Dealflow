@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# a newer push to the same branch cancels the run in progress
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # the AI agents stay off in CI, whatever credentials happen to be around
+  AI_ENABLED: "false"
+  SECRET_KEY: ci-only-secret-not-used-anywhere-else
+
+jobs:
+  backend:
+    name: Backend (lint, migrations, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dealflow
+          POSTGRES_PASSWORD: dealflow
+          POSTGRES_DB: dealflow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dealflow" --health-interval 5s --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow
+      TEST_DATABASE_URL: postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow_test
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Migrations apply and match the models
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+      - name: Create the test database
+        run: PGPASSWORD=dealflow psql -h localhost -U dealflow -d dealflow -c "CREATE DATABASE dealflow_test"
+      - name: Tests
+        run: uv run pytest -q
+      - name: The front end's API schema is up to date
+        run: |
+          uv run python scripts/export_openapi.py
+          git diff --exit-code -- ../frontend/openapi.json || {
+            echo "::error::frontend/openapi.json is stale: run scripts/export_openapi.py and npm run generate-client"
+            exit 1
+          }
+
+  frontend:
+    name: Front end (format, lint, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Generated API client matches the schema
+        run: |
+          npm run generate-client
+          git diff --exit-code -- src/client || {
+            echo "::error::src/client is stale: run npm run generate-client"
+            exit 1
+          }
+      - run: npx prettier --check src e2e
+      - run: npm run lint
+      - run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dealflow
+          POSTGRES_PASSWORD: dealflow
+          POSTGRES_DB: dealflow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dealflow" --health-interval 5s --health-timeout 5s
+          --health-retries 10
+    env:
+      # scripts/e2e_db.py derives the dealflow_e2e database from this and resets it
+      DATABASE_URL: postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+        working-directory: backend
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run e2e
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7

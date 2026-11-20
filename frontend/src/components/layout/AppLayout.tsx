@@ -97,14 +97,26 @@ export function AppLayout() {
       >
         <Sparkles className="text-brand-600" /> Ask Copilot
       </Button>
-      <div className="flex items-center gap-3 rounded-md border border-line p-2">
-        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">
-          {initials(name)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{name}</div>
-          <Badge className="capitalize">{user?.role}</Badge>
-        </div>
+      <div className="flex items-center gap-1 rounded-md border border-line p-1">
+        <NavLink
+          to="/account"
+          onClick={() => setOpen(false)}
+          title="Your account"
+          className={({ isActive }) =>
+            cn(
+              "flex min-w-0 flex-1 items-center gap-3 rounded p-1 transition-colors hover:bg-muted",
+              isActive && "bg-brand-50",
+            )
+          }
+        >
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold">
+            {initials(name)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">{name}</div>
+            <Badge className="capitalize">{user?.role}</Badge>
+          </div>
+        </NavLink>
         <Button variant="ghost" size="icon" onClick={logout} aria-label="Sign out" title="Sign out">
           <LogOut />
         </Button>

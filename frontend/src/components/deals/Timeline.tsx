@@ -21,6 +21,7 @@ import { DEAL_QUERIES, apiErrorMessage, invalidate } from "@/lib/api"
 import { useNow } from "@/lib/time"
 import { useToast } from "@/lib/toast"
 import { cn, formatMoney, timeAgo } from "@/lib/utils"
+import { VIA_LABELS } from "@/lib/sources"
 
 const FIELD_LABELS: Record<string, string> = {
   expected_close_date: "expected close date",
@@ -97,12 +98,6 @@ function Row({
       <div className="min-w-0 flex-1 pt-1">{children}</div>
     </li>
   )
-}
-
-const VIA_LABELS: Record<string, string> = {
-  copilot: "via Copilot",
-  pipeline_agent: "via Pipeline agent",
-  auto_reminder: "Automatic reminder",
 }
 
 function ViaBadge({ via }: { via: string }) {

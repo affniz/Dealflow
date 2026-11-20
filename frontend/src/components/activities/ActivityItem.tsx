@@ -9,12 +9,7 @@ import { DEAL_QUERIES, apiErrorMessage, invalidate } from "@/lib/api"
 import { formatDateTime, useNow } from "@/lib/time"
 import { useToast } from "@/lib/toast"
 import { cn, timeAgo } from "@/lib/utils"
-
-const VIA_LABELS: Record<string, string> = {
-  copilot: "via Copilot",
-  pipeline_agent: "via Pipeline agent",
-  auto_reminder: "Automatic reminder",
-}
+import { VIA_LABELS } from "@/lib/sources"
 
 type LinkKind = "deal" | "contact" | "company"
 

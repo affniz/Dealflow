@@ -87,6 +87,8 @@ def get_client() -> MessagesClient | None:
     """
     import anthropic
 
+    if not settings.AI_ENABLED:
+        return None
     if settings.ANTHROPIC_API_KEY:
         return anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
     if _sdk_has_credentials():

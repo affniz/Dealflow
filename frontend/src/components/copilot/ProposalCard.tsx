@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/card"
 import { DEAL_QUERIES, apiErrorMessage, invalidate } from "@/lib/api"
 import { useToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
+import { SOURCE_LABELS } from "@/lib/sources"
 
 /** A change an agent wants to make; nothing happens until someone approves it. */
 export function ProposalCard({
@@ -73,7 +74,7 @@ export function ProposalCard({
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="text-xs text-ink-faint">
-          {proposal.source === "pipeline_agent" ? "Pipeline agent" : "Copilot"} suggestion
+          {SOURCE_LABELS[proposal.source] ?? "Agent"} suggestion
         </span>
         {pending ? (
           canDecide ? (

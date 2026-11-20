@@ -1,5 +1,7 @@
 # Dealflow
 
+[![CI](https://github.com/affniz/Dealflow/actions/workflows/ci.yml/badge.svg)](https://github.com/affniz/Dealflow/actions/workflows/ci.yml)
+
 An agentic CRM for B2B sales teams: a FastAPI + PostgreSQL backend with Celery/Redis background
 jobs, a React front end, and a Claude-powered Copilot that looks things up and prepares changes,
 with a person approving every change.
@@ -29,7 +31,7 @@ with a person approving every change.
 
 Agents see only their own numbers everywhere; owners, admins and viewers see the whole team.
 
-**Front end** (React, in progress)
+**Front end** (React)
 - **Pipeline board**: drag deals between stages (the move shows instantly and is undone if the
   server refuses it); each column shows its count, total, weighted forecast and stalled deals;
   "My deals" and "Stalled only" filters; add a deal from the board
@@ -48,6 +50,8 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - **Settings** (admins): add people, change roles, deactivate and reactivate; rename, reorder,
   add and delete stages and set their win chance and the stalled-deal limit; add, rename and
   retire lost reasons; AI models and budgets
+- **Your account** (everyone): change your name and password, and create tokens for
+  connecting Claude
 - Sign-in and role-aware screens: viewers get no edit controls, agents see only their own deals;
   works on phones and follows the system light/dark setting
 
@@ -58,6 +62,17 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   cards you approve or reject, in the chat or on the deal page; approved changes show
   "via Copilot" on the timeline
 - Viewers can ask questions but can't change anything
+
+**Claude over MCP**
+- Dealflow is an [MCP](https://modelcontextprotocol.io) server at `/mcp`, so Claude Code,
+  Claude Desktop or any MCP client can work with the CRM directly: "which of my deals are
+  stalled?", "draft follow-up tasks for everything in Negotiation"
+- It serves the Copilot's own twelve tools, as the person whose personal access token connects
+  it: same access rules (an agent's Claude sees only their deals), and every change it wants to
+  make lands in that person's **agent inbox** for approval, marked "Claude (MCP)"
+- Create and revoke tokens under **Your account**, which also prints the `claude mcp add`
+  command. Only a SHA-256 hash of each token is stored, and a deactivated person's tokens stop
+  working at once
 
 **Pipeline agent (AI)**
 - Every morning (07:00 in the team's time zone) it reviews each stalled deal as the deal's owner:
@@ -125,6 +140,21 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - **Tests** (`tests/test_copilot.py`, `tests/test_pipeline_agent.py`) use a scripted stand-in for
   Claude: no network or API key.
 
+### Connect Claude to Dealflow (MCP)
+
+1. In Dealflow, open **Your account** (your name at the bottom of the sidebar) and create a token.
+2. Run the command it shows, for example:
+
+   ```bash
+   claude mcp add --transport http dealflow http://localhost:5173/mcp --header "Authorization: Bearer dfp_…"
+   ```
+
+3. Ask Claude about your pipeline. Approve or reject what it suggests in the agent inbox.
+
+Other MCP clients connect to the same URL over Streamable HTTP with that header. The server
+(`app/mcp_server.py`) is mounted in the API, stateless with JSON responses, so it needs no
+extra process and works behind several API workers.
+
 ## Run it
 
 You need Python 3.11+, [uv](https://docs.astral.sh/uv/) and Docker (for Postgres and Redis).
@@ -190,6 +220,22 @@ npm run format                # Prettier
 (cd ../backend && uv run python scripts/export_openapi.py) && npm run generate-client
 ```
 
+End-to-end tests (Playwright) drive the real app in Chromium: signing in, the board (including
+drag and drop), deals won and lost, contacts, activities, role access, the dashboard, settings,
+and connecting Claude over MCP. They start their own API and front end on ports 8010 and 5174,
+on a `dealflow_e2e` database that is reset to the demo data on every run, with AI turned off:
+
+```bash
+cd frontend
+npx playwright install chromium   # once
+npm run e2e
+```
+
+**CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`: backend lint,
+migrations applied and checked against the models, the test suite on Postgres, a check that the
+generated API schema and client are up to date, front-end formatting, lint and build, and the
+end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
+
 ## Layout
 
 ```
@@ -200,6 +246,7 @@ backend/app/
   api/routes/          one file per resource
   agent/               AI agents: shared tool-use loop, tools, Copilot, pipeline agent,
                        proposal approval, usage ledger and prices
+  mcp_server.py        the MCP server at /mcp (the Copilot's tools, for Claude via a token)
   services/actions.py  every change to deals and activities (used by the API and the agents)
   services/rotting.py  stalled-deal check (run by the worker)
   services/stats.py    totals and weighted forecasts
@@ -207,25 +254,28 @@ backend/app/
   initial_data.py      first owner, default "Sales" pipeline, lost reasons
   demo_data.py         demo sales team, companies, contacts and deals
 backend/alembic/       migrations
+backend/scripts/       OpenAPI export, live AI check, e2e database and server
 backend/tests/
 frontend/src/
   client/              generated API client and React Query hooks (don't edit by hand)
   lib/auth.ts          sign-in token, current user, role permissions
   components/          layout, route guards, UI building blocks
   pages/               one file per screen
+frontend/e2e/          Playwright end-to-end tests
+.github/workflows/     CI
 ```
 
 ## Roadmap
 
 - [x] Phase 1: core backend
 - [x] Phase 2: rotting deals, kanban board data, lost-reason analytics
-- [ ] Phase 3: React front end and AI agents
+- [x] Phase 3: React front end and AI agents
   - [x] 3a: front-end skeleton, sign-in, generated API client, read-only board
   - [x] 3b: drag-and-drop board, deal page with timeline
   - [x] 3c: agent foundation: shared action layer, Copilot chat with approval of every change
   - [x] 3d: pipeline agent that reviews stalled deals every morning, and an agent inbox
-  - [ ] 3e: contacts, companies, my activities
-  - [ ] 3f: dashboard charts, admin settings
-  - [ ] 3g: end-to-end tests and CI; MCP server so Claude can work with Dealflow directly
+  - [x] 3e: contacts, companies, my activities
+  - [x] 3f: dashboard charts, admin settings
+  - [x] 3g: end-to-end tests and CI; MCP server so Claude can work with Dealflow directly
 - [ ] Phase 4: CSV import with dedupe, saved views, live board updates over WebSockets,
       WhatsApp messaging
