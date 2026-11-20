@@ -10,32 +10,79 @@ import {
 } from "@/client/@tanstack/react-query.gen"
 import type { AiSettings, AiSettingsView, BudgetsOutput } from "@/client/types.gen"
 import { PageHeader } from "@/components/layout/AppLayout"
+import { LostReasonSettings } from "@/components/settings/LostReasonSettings"
+import { PipelineSettings } from "@/components/settings/PipelineSettings"
+import { TeamSettings } from "@/components/settings/TeamSettings"
 import { Button } from "@/components/ui/button"
 import { Card, Spinner } from "@/components/ui/card"
 import { Field, Select } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { apiErrorMessage } from "@/lib/api"
+import { useListParams } from "@/lib/listParams"
 import { useToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 type EffortLevel = AiSettings["copilot_effort"]
 
-/** Admin settings. AI models for now; users, pipelines and lost reasons come in 3f. */
+const TABS = [
+  { value: "team", label: "Team" },
+  { value: "pipelines", label: "Pipelines" },
+  { value: "lost-reasons", label: "Lost reasons" },
+  { value: "ai", label: "AI" },
+] as const
+
+/** Admin settings: people and roles, pipelines and stages, lost reasons, AI models and budgets. */
 export function SettingsPage() {
-  const view = useQuery(settingsReadAiSettingsOptions())
+  const { params, set } = useListParams()
+  const tab = TABS.find((t) => t.value === params.get("tab"))?.value ?? "team"
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="max-w-4xl px-4 pb-8 md:px-6">
-        {view.isPending ? (
-          <Spinner />
-        ) : view.isError ? (
-          <p className="text-sm text-red-600">Couldn't load settings.</p>
-        ) : (
-          <AiModels view={view.data} key={JSON.stringify(view.data.settings)} />
-        )}
-        <BudgetsSection />
+      <div className="max-w-4xl space-y-5 px-4 pb-8 md:px-6">
+        <div
+          role="tablist"
+          aria-label="Settings"
+          className="flex gap-1 overflow-x-auto border-b border-line"
+        >
+          {TABS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.value}
+              onClick={() => set({ tab: t.value === "team" ? null : t.value })}
+              className={cn(
+                "-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap",
+                tab === t.value
+                  ? "border-brand-600 text-brand-700"
+                  : "border-transparent text-ink-soft hover:text-ink",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {tab === "team" && <TeamSettings />}
+        {tab === "pipelines" && <PipelineSettings />}
+        {tab === "lost-reasons" && <LostReasonSettings />}
+        {tab === "ai" && <AiSettings />}
       </div>
+    </>
+  )
+}
+
+function AiSettings() {
+  const view = useQuery(settingsReadAiSettingsOptions())
+  return (
+    <>
+      {view.isPending ? (
+        <Spinner />
+      ) : view.isError ? (
+        <p className="text-sm text-red-600">Couldn't load settings.</p>
+      ) : (
+        <AiModels view={view.data} key={JSON.stringify(view.data.settings)} />
+      )}
+      <BudgetsSection />
     </>
   )
 }

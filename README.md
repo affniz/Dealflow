@@ -42,6 +42,12 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - **My activities**: open tasks, calls, meetings and emails grouped into Overdue, Today (in your
   own time zone), Upcoming and No due date; a "Done & notes" history; tick things off, edit them
   in a side panel, or add one linked to a deal, contact and company
+- **Dashboard**: open pipeline, weighted forecast, won value and win rate for a period; open value
+  by stage and lost deals by reason as bar charts (each with a table view); the stalled deals.
+  Filter by pipeline, period and (for admins) person; agents see their own numbers
+- **Settings** (admins): add people, change roles, deactivate and reactivate; rename, reorder,
+  add and delete stages and set their win chance and the stalled-deal limit; add, rename and
+  retire lost reasons; AI models and budgets
 - Sign-in and role-aware screens: viewers get no edit controls, agents see only their own deals;
   works on phones and follows the system light/dark setting
 

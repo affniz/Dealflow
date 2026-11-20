@@ -6,6 +6,7 @@ import { ActivitiesPage } from "@/pages/ActivitiesPage"
 import { BoardPage } from "@/pages/BoardPage"
 import { CompaniesPage } from "@/pages/CompaniesPage"
 import { CompanyPage } from "@/pages/CompanyPage"
+import { DashboardPage } from "@/pages/DashboardPage"
 import { ContactPage } from "@/pages/ContactPage"
 import { ContactsPage } from "@/pages/ContactsPage"
 import { DealPage } from "@/pages/DealPage"
@@ -13,7 +14,6 @@ import { InboxPage } from "@/pages/InboxPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { UsagePage } from "@/pages/UsagePage"
 import { LoginPage } from "@/pages/LoginPage"
-import { PlaceholderPage } from "@/pages/PlaceholderPage"
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
           { path: "companies", element: <CompaniesPage /> },
           { path: "companies/:companyId", element: <CompanyPage /> },
           { path: "activities", element: <ActivitiesPage /> },
-          { path: "dashboard", element: <PlaceholderPage title="Dashboard" milestone="3f" /> },
+          { path: "dashboard", element: <DashboardPage /> },
           { path: "inbox", element: <InboxPage /> },
           {
             element: <RequireAdmin />,

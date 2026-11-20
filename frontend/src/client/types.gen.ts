@@ -1481,6 +1481,14 @@ export type PipelineSummary = {
      */
     weighted_value: string;
     /**
+     * Rotting Count
+     */
+    rotting_count?: number;
+    /**
+     * Since
+     */
+    since?: string | null;
+    /**
      * Won Count
      */
     won_count: number;
@@ -1492,6 +1500,14 @@ export type PipelineSummary = {
      * Lost Count
      */
     lost_count: number;
+    /**
+     * Lost Value
+     */
+    lost_value?: string;
+    /**
+     * Win Rate
+     */
+    win_rate?: number | null;
 };
 
 /**
@@ -1541,6 +1557,18 @@ export type StageCreate = {
      * Win chance, percent
      */
     probability?: number;
+};
+
+/**
+ * StageOrder
+ *
+ * Every stage id of a pipeline, in the order they should appear.
+ */
+export type StageOrder = {
+    /**
+     * Stage Ids
+     */
+    stage_ids: Array<number>;
 };
 
 /**
@@ -2689,6 +2717,36 @@ export type PipelinesAddStageResponses = {
 
 export type PipelinesAddStageResponse = PipelinesAddStageResponses[keyof PipelinesAddStageResponses];
 
+export type PipelinesReorderStagesData = {
+    body: StageOrder;
+    path: {
+        /**
+         * Pipeline Id
+         */
+        pipeline_id: number;
+    };
+    query?: never;
+    url: '/api/v1/pipelines/{pipeline_id}/stage-order';
+};
+
+export type PipelinesReorderStagesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PipelinesReorderStagesError = PipelinesReorderStagesErrors[keyof PipelinesReorderStagesErrors];
+
+export type PipelinesReorderStagesResponses = {
+    /**
+     * Successful Response
+     */
+    200: PipelinePublic;
+};
+
+export type PipelinesReorderStagesResponse = PipelinesReorderStagesResponses[keyof PipelinesReorderStagesResponses];
+
 export type PipelinesDeleteStageData = {
     body?: never;
     path: {
@@ -2913,6 +2971,10 @@ export type DealsListDealsData = {
          * Company Id
          */
         company_id?: number | null;
+        /**
+         * Owner Id
+         */
+        owner_id?: number | null;
         /**
          * Rotting
          *
@@ -3409,7 +3471,20 @@ export type DashboardPipelineSummaryData = {
          */
         pipeline_id: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Owner Id
+         *
+         * Only deals owned by this user
+         */
+        owner_id?: number | null;
+        /**
+         * Days
+         *
+         * Count won and lost deals closed in the last N days
+         */
+        days?: number | null;
+    };
     url: '/api/v1/dashboard/pipeline/{pipeline_id}';
 };
 
@@ -3439,6 +3514,12 @@ export type DashboardLostReasonsData = {
          * Pipeline Id
          */
         pipeline_id?: number | null;
+        /**
+         * Owner Id
+         *
+         * Only deals owned by this user
+         */
+        owner_id?: number | null;
         /**
          * Days
          *

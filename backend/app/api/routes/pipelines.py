@@ -15,6 +15,7 @@ from app.models import (
     PipelineUpdate,
     Stage,
     StageCreate,
+    StageOrder,
     StagePublic,
     StageUpdate,
 )
@@ -71,8 +72,31 @@ def update_pipeline(
     status_code=status.HTTP_201_CREATED,
 )
 def add_stage(session: SessionDep, _: AdminUser, pipeline_id: int, body: StageCreate) -> Stage:
-    _get_or_404(session, Pipeline, pipeline_id)
-    return save(session, Stage.model_validate(body, update={"pipeline_id": pipeline_id}))
+    pipeline = _get_or_404(session, Pipeline, pipeline_id)
+    update: dict[str, int] = {"pipeline_id": pipeline_id}
+    if "position" not in body.model_fields_set:  # a new stage goes at the end
+        update["position"] = max((s.position for s in pipeline.stages), default=-1) + 1
+    return save(session, Stage.model_validate(body, update=update))
+
+
+@router.put("/pipelines/{pipeline_id}/stage-order", response_model=PipelinePublic)
+def reorder_stages(
+    session: SessionDep, _: AdminUser, pipeline_id: int, body: StageOrder
+) -> Pipeline:
+    """Put the pipeline's stages in this order (positions become 0, 1, 2, ...)."""
+    pipeline = _get_or_404(session, Pipeline, pipeline_id)
+    stages = {s.id: s for s in pipeline.stages}
+    if sorted(body.stage_ids) != sorted(stages):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "List every stage of this pipeline exactly once"
+        )
+    for position, stage_id in enumerate(body.stage_ids):
+        stages[stage_id].position = position
+        session.add(stages[stage_id])
+    session.commit()
+    session.refresh(pipeline)
+    session.expire(pipeline, ["stages"])  # reload them in the new order
+    return pipeline
 
 
 @router.patch("/stages/{stage_id}", response_model=StagePublic)
