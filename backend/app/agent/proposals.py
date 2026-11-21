@@ -2,7 +2,7 @@
 action layer as the approving person, so their access rules apply at that moment."""
 
 from fastapi import HTTPException, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.models import ActivityCreate, AgentProposal, ProposalStatus, Role, User, utcnow
 from app.services import actions
@@ -39,28 +39,51 @@ def _apply(session: Session, p: AgentProposal, user: User) -> None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown action {p.action}")
 
 
-def decide(session: Session, user: User, proposal: AgentProposal, approve: bool) -> AgentProposal:
-    if not can_decide(user, proposal):
+def _locked(session: Session, proposal_id: int) -> AgentProposal | None:
+    """The proposal, read fresh and locked until this transaction ends."""
+    stmt = (
+        select(AgentProposal)
+        .where(AgentProposal.id == proposal_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return session.exec(stmt).first()
+
+
+def decide(session: Session, user: User, proposal_id: int, approve: bool) -> AgentProposal:
+    """Approve or reject a proposal.
+
+    The proposal's row stays locked until the decision is committed, so a second click (or a
+    second admin) waits and then finds it decided, instead of applying the change twice. An
+    approved change and the proposal's new status are committed together.
+    """
+    proposal = _locked(session, proposal_id)
+    if proposal is None or not can_decide(user, proposal):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Proposal not found")
-    if proposal.status != ProposalStatus.pending:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"Proposal is already {proposal.status}")
+    _check_pending(proposal)
     proposal.decided_by_id = user.id
     proposal.decided_at = utcnow()
-    if not approve:
-        proposal.status = ProposalStatus.rejected
-    else:
+    proposal.status = ProposalStatus.approved if approve else ProposalStatus.rejected
+    session.add(proposal)
+    if approve:
         try:
-            _apply(session, proposal, user)  # commits on success
-            proposal.status = ProposalStatus.approved
+            _apply(session, proposal, user)  # its commit saves the proposal's status too
         except HTTPException as exc:
             # e.g. the deal was closed or reassigned since the proposal was made
-            session.rollback()
-            session.refresh(proposal)
+            session.rollback()  # drops the half-made change and releases the lock
+            proposal = _locked(session, proposal_id)
+            assert proposal is not None
+            _check_pending(proposal)  # decided by someone else in the meantime
             proposal.decided_by_id = user.id
             proposal.decided_at = utcnow()
             proposal.status = ProposalStatus.failed
             proposal.error = str(exc.detail)
-    session.add(proposal)
+            session.add(proposal)
     session.commit()
     session.refresh(proposal)
     return proposal
+
+
+def _check_pending(proposal: AgentProposal) -> None:
+    if proposal.status != ProposalStatus.pending:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Proposal is already {proposal.status}")

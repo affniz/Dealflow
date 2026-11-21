@@ -1,0 +1,57 @@
+# Render Blueprint: the Dealflow web service (API + React app + worker), Postgres and Redis.
+# Deploy: Render dashboard > New > Blueprint > pick this repository. It asks for
+# ANTHROPIC_API_KEY (leave it empty to run without the AI features).
+# The free plans suit a demo: the web service sleeps after 15 idle minutes (the first visit
+# then takes about a minute), and the free database expires after 30 days.
+
+services:
+  - type: web
+    name: dealflow
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass # deploy main once CI passes
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FIRST_OWNER_EMAIL
+        value: owner@example.com
+      - key: FIRST_OWNER_PASSWORD # the owner account's password; see it under Environment
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dealflow-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: dealflow-redis
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Public demo: one-click sign-in as the sample team; passwords, users, AI settings and
+      # budgets are locked, so these caps (USD a month) are the most the AI can spend.
+      - key: DEMO_MODE
+        value: "true"
+      - key: COPILOT_MONTHLY_BUDGET_USD
+        value: "2"
+      - key: PIPELINE_MONTHLY_BUDGET_USD
+        value: "3"
+
+  - type: keyvalue
+    name: dealflow-redis
+    plan: free
+    region: singapore
+    ipAllowList: [] # reachable only from this account's services
+    maxmemoryPolicy: noeviction
+
+databases:
+  - name: dealflow-db
+    plan: free
+    region: singapore
+    databaseName: dealflow
+    user: dealflow
+    postgresMajorVersion: "16"

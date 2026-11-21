@@ -16,6 +16,19 @@ def test_create_deal_takes_pipeline_from_stage(client, login, stages):
     assert d["value"] == "1000.00"
 
 
+def test_deals_must_be_in_the_team_currency(client, login, stages):
+    # totals add deal values together, so a deal in another currency would corrupt them
+    h = login(Role.agent)
+    body = {"title": "x", "value": 10, "stage_id": stages[0]}
+    r = client.post(f"{API}/deals", headers=h, json={**body, "currency": "USD"})
+    assert r.status_code == 422 and "INR" in r.json()["detail"]
+    d = client.post(f"{API}/deals", headers=h, json={**body, "currency": "inr"}).json()
+    assert d["currency"] == "INR"
+    r = client.patch(f"{API}/deals/{d['id']}", headers=h, json={"currency": "USD"})
+    assert r.status_code == 422
+    assert client.get(f"{API}/deals/{d['id']}", headers=h).json()["currency"] == "INR"
+
+
 def test_unknown_stage_is_rejected(client, login):
     body = {"title": "x", "stage_id": 999}
     assert client.post(f"{API}/deals", headers=login(Role.agent), json=body).status_code == 422

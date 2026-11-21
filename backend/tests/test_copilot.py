@@ -3,12 +3,14 @@
 import json
 from datetime import timedelta
 
+import anthropic
+import httpx2
 import pytest
 
 from app.agent import copilot
 from app.agent.tools import TOOL_SPECS
 from app.main import app
-from app.models import Deal, Role, utcnow
+from app.models import AgentConversation, Deal, Role, utcnow
 from app.services.rotting import check_rotting
 from tests.conftest import API
 from tests.fakes import FakeClaude, message, say, tool_call
@@ -341,3 +343,78 @@ def test_prompt_versions_stay_fixed_per_conversation(client, login, claude, sess
     monkeypatch.setattr(copilot, "CURRENT_PROMPT", 3)
     _ask(client, h, "and again", conversation_id=new["id"])
     assert claude.requests[2]["system"][0]["text"] == copilot.PROMPTS[2]
+
+
+def test_no_database_transaction_is_open_while_claude_works(client, login, claude, session, stages):
+    # a turn can take a minute; holding a connection (and a row lock) for it would let a few
+    # busy chats use up the connection pool for the whole API
+    h = login(Role.agent)
+    d = _deal(client, h, stages[0], title="Renewal")
+    seen = []
+
+    def reply(result):
+        def respond(_):
+            seen.append(session.in_transaction())
+            return result
+
+        return respond
+
+    claude.script = [
+        reply(tool_call("get_deal", {"deal_id": d["id"]})),
+        reply(
+            tool_call(
+                "propose_move_stage",
+                {"deal_id": d["id"], "stage_id": stages[1], "reason": "Qualified"},
+                "toolu_2",
+            )
+        ),
+        reply(say("Proposed.")),
+    ]
+    view = _ask(client, h, "Move Renewal on").json()
+    assert seen == [False, False, False]
+    assert [p["status"] for p in view["proposals"]] == ["pending"]
+
+
+def test_one_turn_at_a_time_per_conversation(client, login, claude, session):
+    h = login(Role.agent)
+    claude.script = [say("Hi")]
+    conv = _ask(client, h, "Hello").json()
+    row = session.get(AgentConversation, conv["id"])
+
+    row.turn_started_at = utcnow()  # another tab is waiting for an answer
+    session.add(row)
+    session.commit()
+    r = _ask(client, h, "And now?", conversation_id=conv["id"])
+    assert r.status_code == 409 and "still answering" in r.json()["detail"]
+
+    row.turn_started_at = utcnow() - timedelta(minutes=30)  # that server process died
+    session.add(row)
+    session.commit()
+    claude.script = [say("Here")]
+    assert _ask(client, h, "And now?", conversation_id=conv["id"]).status_code == 200
+    session.refresh(row)
+    assert row.turn_started_at is None
+
+
+def test_failed_turn_withdraws_its_proposals_and_frees_the_chat(client, login, claude, stages):
+    h = login(Role.agent)
+    d = _deal(client, h, stages[0], title="Expansion")
+
+    def fail(_):
+        raise anthropic.APIConnectionError(
+            request=httpx2.Request("POST", "https://api.anthropic.com")
+        )
+
+    claude.script = [
+        tool_call("propose_move_stage", {"deal_id": d["id"], "stage_id": stages[1], "reason": "x"}),
+        fail,
+    ]
+    assert _ask(client, h, "Move Expansion on").status_code == 502
+    mine = client.get(f"{API}/proposals", headers=h).json()
+    assert [(p["status"], p["error"]) for p in mine] == [
+        ("failed", "Copilot's reply didn't finish, so this suggestion was withdrawn")
+    ]
+    conv = client.get(f"{API}/copilot/conversations", headers=h).json()[0]
+    claude.script = [say("Back")]
+    view = _ask(client, h, "Try again", conversation_id=conv["id"]).json()
+    assert [i["text"] for i in view["items"]] == ["Try again", "Back"]

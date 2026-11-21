@@ -159,7 +159,11 @@ def run_turn(
         conversation_id=conversation.id,
         usage_sink=usage_sink,
         budget_check=lambda: copilot_block_reason(session, user),
+        # release the database connection while Claude works: a turn can take a minute, and
+        # holding a connection for it would let a few busy chats starve the whole API
+        before_call=session.commit,
     )
+    conversation.turn_started_at = None
     conversation.input_tokens += result.input_tokens
     conversation.output_tokens += result.output_tokens
     conversation.messages = result.messages  # a new list, so SQLAlchemy saves the JSON column

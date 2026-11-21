@@ -13,6 +13,7 @@ from fastapi import HTTPException, status
 from sqlmodel import Session
 
 from app.api.access import apply_update, check_ref, get_visible, resolve_owner
+from app.core.config import settings
 from app.models import (
     Activity,
     ActivityCreate,
@@ -58,14 +59,32 @@ def _commit(session: Session, obj: Any) -> Any:
 # ---------------------------------------------------------------- deals
 
 
+def _team_currency(currency: str) -> str:
+    """Deals must be in the team's currency: the board, dashboard, forecasts and the agents add
+    deal values together, and Dealflow doesn't convert between currencies."""
+    code = currency.upper()
+    if code != settings.DEFAULT_CURRENCY:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Deals are in {settings.DEFAULT_CURRENCY} here; other currencies aren't supported yet",
+        )
+    return code
+
+
 def create_deal(session: Session, user: User, body: DealCreate, via: str | None = None) -> Deal:
     require_writer(user)
     stage = _stage(session, body.stage_id)
     check_ref(session, Contact, body.contact_id, user)
     check_ref(session, Company, body.company_id, user)
     owner_id = resolve_owner(session, user, body.owner_id)
+    currency = body.currency if "currency" in body.model_fields_set else settings.DEFAULT_CURRENCY
     deal = Deal.model_validate(
-        body, update={"owner_id": owner_id, "pipeline_id": stage.pipeline_id}
+        body,
+        update={
+            "owner_id": owner_id,
+            "pipeline_id": stage.pipeline_id,
+            "currency": _team_currency(currency),
+        },
     )
     session.add(deal)
     session.flush()
@@ -80,6 +99,8 @@ def update_deal(
     require_writer(user)
     deal = get_visible(session, Deal, deal_id, user)
     data = dict(data)
+    if data.get("currency") is not None:
+        data["currency"] = _team_currency(data["currency"])
     if "contact_id" in data:
         check_ref(session, Contact, data["contact_id"], user)
     if "company_id" in data:

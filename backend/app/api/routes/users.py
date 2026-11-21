@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlmodel import col, select
 
 from app.api.access import paginate, save
-from app.api.deps import AdminUser, CurrentUser, SessionDep
+from app.api.deps import AdminUser, CurrentUser, NotInDemo, SessionDep
 from app.core.security import hash_password, verify_password
 from app.models import (
     Message,
@@ -32,7 +32,7 @@ def update_me(session: SessionDep, user: CurrentUser, body: UserUpdateMe) -> Use
     return save(session, user)
 
 
-@router.post("/me/password", response_model=Message)
+@router.post("/me/password", response_model=Message, dependencies=[NotInDemo])
 def change_password(session: SessionDep, user: CurrentUser, body: PasswordChange) -> Message:
     if not verify_password(body.current_password, user.hashed_password):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is wrong")
@@ -65,7 +65,12 @@ def _check_role_change(actor: User, target_role: Role, target: User | None = Non
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an owner can manage owners")
 
 
-@router.post("", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=UserPublic,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[NotInDemo],
+)
 def create_user(session: SessionDep, actor: AdminUser, body: UserCreate) -> User:
     _check_role_change(actor, body.role)
     email = body.email.lower()
@@ -77,7 +82,7 @@ def create_user(session: SessionDep, actor: AdminUser, body: UserCreate) -> User
     return save(session, user)
 
 
-@router.patch("/{user_id}", response_model=UserPublic)
+@router.patch("/{user_id}", response_model=UserPublic, dependencies=[NotInDemo])
 def update_user(session: SessionDep, actor: AdminUser, user_id: int, body: UserUpdate) -> User:
     user = session.get(User, user_id)
     if user is None:

@@ -203,6 +203,36 @@ cd backend && uv run python scripts/live_check.py --model claude-opus-5-5    # t
 Open http://localhost:5173 and sign in as `owner@example.com` / `changethis123` (from `.env`) or a
 demo user. The API's interactive docs are at http://localhost:8000/docs.
 
+## Deploy
+
+The whole app is one Docker image (`Dockerfile`): it builds the React app, and the API serves
+it from the same address, so there's no CORS to set up and the MCP address is simply the site's
+address + `/mcp`. On start (`backend/scripts/start.sh`) it migrates the database, creates the
+first owner, starts the background worker next to the API (`RUN_WORKER=false` turns that off,
+for hosts where the worker runs as its own service) and serves on `$PORT`.
+
+```bash
+docker build -t dealflow .
+docker run -p 8000:8000 -e SECRET_KEY=... -e FIRST_OWNER_PASSWORD=... \
+  -e DATABASE_URL=postgresql://... -e REDIS_URL=redis://... dealflow
+```
+
+It refuses to start in production with the development `SECRET_KEY` or owner password, and it
+accepts the `postgres://` URLs hosts hand out.
+
+**Render**: `render.yaml` is a Blueprint for the web service, Postgres and Redis, on free plans
+in Singapore. In Render, choose **New > Blueprint**, pick this repository and paste an Anthropic
+API key when asked (or leave it empty to run without the AI). It redeploys when `main` passes
+CI. The owner account's password is generated: find `FIRST_OWNER_PASSWORD` under the service's
+Environment. Free plans suit a demo: the service sleeps after 15 idle minutes (the next visit
+takes about a minute) and the free database expires after 30 days.
+
+**Public demo** (`DEMO_MODE=true`, on in `render.yaml`): loads the sample team on first start and
+puts one-click sign-in for each role on the sign-in page. Visitors share one database, so it
+refuses the changes that would spoil it for the next person or raise the AI bill: passwords,
+adding or changing people, AI models and budgets. That makes the budgets a hard ceiling; the
+Blueprint sets $2 a month per person for the Copilot and $3 for the pipeline agent.
+
 ## Develop
 
 ```bash
@@ -236,6 +266,36 @@ migrations applied and checked against the models, the test suite on Postgres, a
 generated API schema and client are up to date, front-end formatting, lint and build, and the
 end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
 
+## Product decisions
+
+- **The AI proposes; a person approves.** CRM data feeds forecasts and commissions, so a wrong
+  write costs more than a slow one. Every change the Copilot, the pipeline agent or Claude over
+  MCP wants to make is a proposal, applied through the same action layer as the app's own
+  buttons, with the approver's access checked at the moment they approve.
+- **The AI has exactly the user's access.** Tools run as the signed-in person, so an agent's
+  Copilot can't read a colleague's deals, and a viewer's can't propose anything. Access rules
+  live in one place (`api/access.py`) instead of being repeated in prompts.
+- **Stalled deals are the agent's job.** Pipelines rarely leak because of one bad call; they
+  leak because deals sit untouched. The worker flags deals that have overstayed their stage and
+  the pipeline agent turns each into at most two concrete next steps, every morning, before the
+  team starts.
+- **Spending has a ceiling.** Monthly budgets per person and for the team are checked before
+  every model call, and every call is recorded with its cost, so an admin can answer "what does
+  the AI cost us per deal reviewed?" from the AI usage page.
+- **Built for Indian B2B teams.** Rupees by default with lakh and crore, the team's time zone
+  (default Asia/Kolkata) for "today" and the morning review, and the agent writes amounts the
+  way the team says them.
+- **One set of tools, three ways in.** The Copilot, the pipeline agent and the MCP server share
+  the same twelve tools, so Claude Code or Claude Desktop gets the same abilities and limits as
+  the in-app Copilot. MCP uses personal access tokens (stored hashed, revocable) rather than
+  OAuth: simpler for a team tool, and enough until there's a need for third-party apps.
+- **Cache-friendly by construction.** Conversation history is append-only and the system
+  prompt never changes inside a chat (new prompt versions apply to new chats), so prompt
+  caching keeps working and long chats stay cheap.
+- **Left out on purpose (for now)**: email and calendar sync, WhatsApp, CSV import and live
+  updates. They're the next phase; the core loop of deals, stalls, suggestions and approvals
+  came first.
+
 ## Layout
 
 ```
@@ -254,7 +314,7 @@ backend/app/
   initial_data.py      first owner, default "Sales" pipeline, lost reasons
   demo_data.py         demo sales team, companies, contacts and deals
 backend/alembic/       migrations
-backend/scripts/       OpenAPI export, live AI check, e2e database and server
+backend/scripts/       start (Docker), OpenAPI export, live AI check, e2e database and server
 backend/tests/
 frontend/src/
   client/              generated API client and React Query hooks (don't edit by hand)
@@ -263,6 +323,8 @@ frontend/src/
   pages/               one file per screen
 frontend/e2e/          Playwright end-to-end tests
 .github/workflows/     CI
+Dockerfile             the deployable image (API + React app + worker)
+render.yaml            Render Blueprint: web service, Postgres, Redis
 ```
 
 ## Roadmap
@@ -277,5 +339,9 @@ frontend/e2e/          Playwright end-to-end tests
   - [x] 3e: contacts, companies, my activities
   - [x] 3f: dashboard charts, admin settings
   - [x] 3g: end-to-end tests and CI; MCP server so Claude can work with Dealflow directly
+- [ ] Ship
+  - [x] One Docker image, a Render Blueprint and a public demo mode
+  - [x] Product decisions in this README
+  - [ ] Live demo link and a GIF
 - [ ] Phase 4: CSV import with dedupe, saved views, live board updates over WebSockets,
       WhatsApp messaging

@@ -111,6 +111,20 @@ class UserUpdateMe(SQLModel):
     full_name: str | None = Field(default=None, max_length=255)
 
 
+class DemoAccount(SQLModel):
+    email: str
+    full_name: str
+    role: Role
+
+
+class AppConfig(SQLModel):
+    """What the sign-in page needs to know before anyone signs in."""
+
+    demo: bool  # a public demo: some settings are locked
+    demo_password: str | None = None
+    demo_accounts: list[DemoAccount] = []
+
+
 class PasswordChange(SQLModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
@@ -602,6 +616,8 @@ class AgentConversation(SQLModel, table=True):
     model: str | None = Field(default=None, max_length=100)
     effort: str | None = Field(default=None, max_length=10)
     prompt_version: int | None = None  # app.agent.copilot.PROMPTS key; fixed like the model
+    # set while a turn is being answered, so a second message waits for it (see send_message)
+    turn_started_at: datetime | None = None
     input_tokens: int = 0
     output_tokens: int = 0
     created_at: datetime = Field(default_factory=utcnow)

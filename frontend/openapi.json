@@ -5,6 +5,28 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/config": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Read Config",
+        "description": "Public: whether this is the demo, and the demo accounts to sign in with.",
+        "operationId": "config-read_config",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/login/access-token": {
       "post": {
         "tags": [
@@ -4489,6 +4511,39 @@
         ],
         "title": "ApiTokenPublic"
       },
+      "AppConfig": {
+        "properties": {
+          "demo": {
+            "type": "boolean",
+            "title": "Demo"
+          },
+          "demo_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demo Password"
+          },
+          "demo_accounts": {
+            "items": {
+              "$ref": "#/components/schemas/DemoAccount"
+            },
+            "type": "array",
+            "title": "Demo Accounts",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "demo"
+        ],
+        "title": "AppConfig",
+        "description": "What the sign-in page needs to know before anyone signs in."
+      },
       "Board": {
         "properties": {
           "pipeline_id": {
@@ -5870,6 +5925,28 @@
         },
         "type": "object",
         "title": "DealUpdate"
+      },
+      "DemoAccount": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "full_name",
+          "role"
+        ],
+        "title": "DemoAccount"
       },
       "FeatureUsage": {
         "properties": {
