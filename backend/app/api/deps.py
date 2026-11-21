@@ -50,3 +50,12 @@ def require_roles(*roles: Role) -> Callable[[User], User]:
 WriterUser = Annotated[User, Depends(require_roles(Role.owner, Role.admin, Role.agent))]
 # can manage users, pipelines, lost reasons
 AdminUser = Annotated[User, Depends(require_roles(Role.owner, Role.admin))]
+
+
+def refuse_in_demo() -> None:
+    if settings.DEMO_MODE:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "That's turned off in the public demo")
+
+
+# for changes that would lock other demo visitors out or raise AI spending
+NotInDemo = Depends(refuse_in_demo)

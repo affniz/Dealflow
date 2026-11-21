@@ -1,6 +1,7 @@
 """Load a small, realistic sales team and pipeline for demos and manual testing.
 
 Usage: python -m app.demo_data   (run app.initial_data first; refuses to run twice)
+       python -m app.demo_data --if-missing   (does nothing if it's already loaded)
 Every demo user's password is "demo-password".
 """
 
@@ -85,7 +86,7 @@ def account_owners() -> dict[int, int]:
 
 
 def load(session: Session) -> None:
-    if session.exec(select(User).where(User.email == USERS[0][0])).first():
+    if is_loaded(session):
         raise SystemExit("Demo data is already loaded.")
     owner = session.exec(select(User).where(User.role == Role.owner)).one()
     pipeline = session.exec(select(Pipeline).order_by(Pipeline.id)).first()  # type: ignore[arg-type]
@@ -193,6 +194,15 @@ def load(session: Session) -> None:
     print(f"Demo data loaded ({result.flagged} stalled deals). Password: {PASSWORD}")
 
 
+def is_loaded(session: Session) -> bool:
+    return session.exec(select(User).where(User.email == USERS[0][0])).first() is not None
+
+
 if __name__ == "__main__":
+    import sys
+
     with Session(engine) as s:
-        load(s)
+        if "--if-missing" in sys.argv and is_loaded(s):
+            print("Demo data is already loaded")
+        else:
+            load(s)

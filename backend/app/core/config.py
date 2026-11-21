@@ -1,12 +1,13 @@
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 DEV_SECRET = "dev-only-insecure-secret-change-me-before-deploying"
+DEV_OWNER_PASSWORD = "changethis123"
 
 
 class Settings(BaseSettings):
@@ -27,9 +28,16 @@ class Settings(BaseSettings):
     ROTTING_CHECK_INTERVAL_SECONDS: int = 3600
 
     FIRST_OWNER_EMAIL: str = "owner@example.com"
-    FIRST_OWNER_PASSWORD: str = "changethis123"
+    FIRST_OWNER_PASSWORD: str = DEV_OWNER_PASSWORD
 
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
+    # The built React app (frontend/dist). When set, the API serves it too, from the same
+    # address, so the deployed app is one service (the Docker image sets this).
+    STATIC_DIR: str | None = None
+    # Public demo: loads the demo team on start, offers one-click demo sign-in, and refuses
+    # changes that would lock other visitors out or raise AI spending (passwords, users, AI
+    # settings and budgets).
+    DEMO_MODE: bool = False
     DEFAULT_CURRENCY: str = "INR"
     # the team's time zone: what "today" and "10am" mean to the AI agents
     TIMEZONE: str = "Asia/Kolkata"
@@ -55,10 +63,22 @@ class Settings(BaseSettings):
     PIPELINE_REVIEW_MAX_STEPS: int = 5  # model calls per deal
     PIPELINE_REVIEW_COOLDOWN_DAYS: int = 3  # don't re-review a deal sooner than this
 
+    @field_validator("DATABASE_URL", "TEST_DATABASE_URL")
+    @classmethod
+    def _use_psycopg(cls, url: str) -> str:
+        # Hosts (Render, Railway, Heroku) hand out postgres:// or postgresql:// URLs
+        for scheme in ("postgres://", "postgresql://"):
+            if url.startswith(scheme):
+                return "postgresql+psycopg://" + url.removeprefix(scheme)
+        return url
+
     @model_validator(mode="after")
     def _no_dev_secrets_in_prod(self) -> "Settings":
-        if self.ENVIRONMENT == "production" and self.SECRET_KEY == DEV_SECRET:
-            raise ValueError("Set SECRET_KEY before running in production")
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY == DEV_SECRET:
+                raise ValueError("Set SECRET_KEY before running in production")
+            if self.FIRST_OWNER_PASSWORD == DEV_OWNER_PASSWORD:
+                raise ValueError("Set FIRST_OWNER_PASSWORD before running in production")
         return self
 
 

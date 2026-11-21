@@ -1,9 +1,12 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.routing import APIRoute
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
     activities,
@@ -14,6 +17,7 @@ from app.api.routes import (
     dashboard,
     deals,
     login,
+    meta,
     pipelines,
     settings,
     tokens,
@@ -54,6 +58,7 @@ app.add_middleware(
 
 api = APIRouter()
 for module in (
+    meta,
     login,
     users,
     tokens,
@@ -77,3 +82,25 @@ app.router.routes.append(mcp_route)
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+def serve_front_end(app: FastAPI, directory: str) -> None:
+    """Serve the built React app from the same address as the API: no CORS, and the MCP URL
+    the Account page shows (this address + /mcp) is right wherever it's deployed."""
+    static = Path(directory).resolve()
+    app.mount("/assets", StaticFiles(directory=static / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def front_end(path: str) -> FileResponse:
+        if path.split("/")[0] in ("api", "mcp", "docs"):
+            raise HTTPException(404, "Not found")
+        file = (static / path).resolve()
+        if path and file.is_file() and file.is_relative_to(static):
+            return FileResponse(file)  # favicon and other files in public/
+        # Any other path is a page of the app: React Router renders it. Never cache this file,
+        # so a new deploy's asset names are picked up at once.
+        return FileResponse(static / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+if config.STATIC_DIR:  # added last, so it only gets paths nothing above claimed
+    serve_front_end(app, config.STATIC_DIR)

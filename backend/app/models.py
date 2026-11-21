@@ -111,6 +111,20 @@ class UserUpdateMe(SQLModel):
     full_name: str | None = Field(default=None, max_length=255)
 
 
+class DemoAccount(SQLModel):
+    email: str
+    full_name: str
+    role: Role
+
+
+class AppConfig(SQLModel):
+    """What the sign-in page needs to know before anyone signs in."""
+
+    demo: bool  # a public demo: some settings are locked
+    demo_password: str | None = None
+    demo_accounts: list[DemoAccount] = []
+
+
 class PasswordChange(SQLModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)

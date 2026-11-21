@@ -400,6 +400,26 @@ export type ApiTokenPublic = {
 };
 
 /**
+ * AppConfig
+ *
+ * What the sign-in page needs to know before anyone signs in.
+ */
+export type AppConfig = {
+    /**
+     * Demo
+     */
+    demo: boolean;
+    /**
+     * Demo Password
+     */
+    demo_password?: string | null;
+    /**
+     * Demo Accounts
+     */
+    demo_accounts?: Array<DemoAccount>;
+};
+
+/**
  * Board
  */
 export type Board = {
@@ -1120,6 +1140,21 @@ export type DealUpdate = {
     custom_fields?: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * DemoAccount
+ */
+export type DemoAccount = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Full Name
+     */
+    full_name: string;
+    role: Role;
 };
 
 /**
@@ -2119,6 +2154,22 @@ export type PageDealPublicWritable = {
      */
     count: number;
 };
+
+export type ConfigReadConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/config';
+};
+
+export type ConfigReadConfigResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppConfig;
+};
+
+export type ConfigReadConfigResponse = ConfigReadConfigResponses[keyof ConfigReadConfigResponses];
 
 export type LoginLoginData = {
     body: BodyLoginLogin;
