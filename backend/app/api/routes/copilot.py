@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,7 +8,7 @@ from sqlalchemy import func
 from sqlmodel import Session, col, select
 
 from app.agent import copilot
-from app.agent.proposals import can_decide, decide
+from app.agent.proposals import decide
 from app.agent.usage import persist_after_failure
 from app.api.access import sees_all
 from app.api.deps import AdminUser, CurrentUser, SessionDep
@@ -28,6 +29,7 @@ from app.models import (
     ProposalStatus,
     Role,
     User,
+    utcnow,
 )
 from app.services.budgets import BudgetExceeded, copilot_block_reason, pipeline_block_reason
 
@@ -157,6 +159,50 @@ def copilot_status(session: SessionDep, _: CurrentUser, client: ClientDep) -> Ag
     )
 
 
+# a turn that started longer ago than this is taken to have died with its server process
+TURN_TIMEOUT = timedelta(minutes=10)
+
+
+def _start_turn(session: Session, user: User, body: CopilotMessageIn) -> AgentConversation:
+    """The conversation, marked as answering a message. The marker, not a lock held for the
+    whole turn, keeps a second message (another tab, a double send) out until it's done."""
+    if body.conversation_id is not None:
+        conv = _own_conversation(session, user, body.conversation_id, lock=True)
+    else:
+        title = " ".join(body.text.split())
+        conv = AgentConversation(user_id=user.id, title=title[:80] or "New chat")  # type: ignore[arg-type]
+    running = conv.turn_started_at
+    if running is not None and utcnow() - running < TURN_TIMEOUT:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Copilot is still answering your last message in this chat. Try again when it's done.",
+        )
+    conv.turn_started_at = utcnow()
+    session.add(conv)
+    session.commit()  # releases the row lock
+    session.refresh(conv)
+    return conv
+
+
+def _end_failed_turn(session: Session, conv_id: int, started: datetime) -> None:
+    """A failed turn isn't added to the chat. Its proposals were committed as it went, so
+    withdraw them, and let the next message in."""
+    conv = session.get(AgentConversation, conv_id)
+    if conv is not None:
+        conv.turn_started_at = None
+        session.add(conv)
+    stmt = select(AgentProposal).where(
+        AgentProposal.conversation_id == conv_id,
+        AgentProposal.status == ProposalStatus.pending,
+        col(AgentProposal.created_at) >= started,
+    )
+    for p in session.exec(stmt):
+        p.status = ProposalStatus.failed
+        p.error = "Copilot's reply didn't finish, so this suggestion was withdrawn"
+        session.add(p)
+    session.commit()
+
+
 @router.post("/copilot/messages", response_model=ConversationView)
 def send_message(
     session: SessionDep, user: CurrentUser, client: ClientDep, body: CopilotMessageIn
@@ -169,26 +215,22 @@ def send_message(
         )
     if (reason := copilot_block_reason(session, user)) is not None:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, reason)
-    if body.conversation_id is not None:
-        conv = _own_conversation(session, user, body.conversation_id, lock=True)
-    else:
-        title = " ".join(body.text.split())
-        conv = AgentConversation(user_id=user.id, title=title[:80] or "New chat")  # type: ignore[arg-type]
-        session.add(conv)
-        session.commit()
-        session.refresh(conv)
-        conv = _own_conversation(session, user, conv.id, lock=True)  # type: ignore[arg-type]
+    conv = _start_turn(session, user, body)
+    conv_id, started = conv.id, conv.turn_started_at
+    assert conv_id is not None and started is not None
 
     import anthropic
 
     billed: list[AIUsage] = []
     try:
+        # commits before each model call, so no connection or lock is held while Claude works
         copilot.run_turn(
             session, client, user, conv, body.text.strip(), body.deal_id, usage_sink=billed
         )
     except Exception as exc:
         session.rollback()
         persist_after_failure(session, billed)  # calls made before the failure were billed
+        _end_failed_turn(session, conv_id, started)
         if isinstance(exc, BudgetExceeded):  # spent by another tab in the meantime
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from None
         if not isinstance(exc, anthropic.APIError):
@@ -296,20 +338,13 @@ def start_pipeline_review(_: AdminUser, client: ClientDep) -> dict[str, bool]:
     return {"queued": True}
 
 
-def _proposal(session: Session, user: User, proposal_id: int) -> AgentProposal:
-    p = session.get(AgentProposal, proposal_id)
-    if p is None or not can_decide(user, p):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Proposal not found")
-    return p
-
-
 @router.post("/proposals/{proposal_id}/approve", response_model=AgentProposalPublic)
 def approve_proposal(
     session: SessionDep, user: CurrentUser, proposal_id: int
 ) -> AgentProposalPublic:
     """Apply the proposed change as the approving user. A change that no longer applies (the
     deal was closed meanwhile, say) is marked failed with the reason."""
-    p = decide(session, user, _proposal(session, user, proposal_id), approve=True)
+    p = decide(session, user, proposal_id, approve=True)
     return _proposals_public(session, [p])[0]
 
 
@@ -317,5 +352,5 @@ def approve_proposal(
 def reject_proposal(
     session: SessionDep, user: CurrentUser, proposal_id: int
 ) -> AgentProposalPublic:
-    p = decide(session, user, _proposal(session, user, proposal_id), approve=False)
+    p = decide(session, user, proposal_id, approve=False)
     return _proposals_public(session, [p])[0]

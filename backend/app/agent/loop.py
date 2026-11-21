@@ -90,12 +90,18 @@ def run_loop(
     max_proposals: int | None = None,
     usage_sink: list[AIUsage] | None = None,
     budget_check: Callable[[], str | None] | None = None,
+    before_call: Callable[[], None] | None = None,
 ) -> LoopResult:
     """`usage_sink` collects the ledger rows of every call made, so a caller whose turn fails
-    can still record what was billed (see app.agent.usage.persist_after_failure)."""
+    can still record what was billed (see app.agent.usage.persist_after_failure).
+
+    `before_call` runs right before each model call, after the last database work of the step.
+    The Copilot commits there, so no database connection or lock is held while Claude thinks.
+    """
     messages = list(messages)
     result = LoopResult(messages=messages)
     turn_id = uuid.uuid4().hex
+    fallback = _fallback_params(model)
 
     for step in range(max_steps):
         # checked before every call, so a turn overshoots its budget by at most one call
@@ -107,6 +113,8 @@ def run_loop(
             result.budget_stopped = True
             result.final_text = messages[-1]["content"]
             break
+        if before_call:
+            before_call()
         response = client.beta.messages.create(
             model=model,
             max_tokens=16000,
@@ -117,7 +125,7 @@ def run_loop(
             messages=messages,
             output_config={"effort": effort},
             cache_control={"type": "ephemeral"},
-            **_fallback_params(model),
+            **fallback,
         )
         for row in records_from_response(
             response,

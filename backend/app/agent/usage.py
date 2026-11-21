@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import Date, cast, func
+from sqlalchemy import inspect as sa_inspect
 from sqlmodel import Session, col, select
 
 from app.agent.pricing import PRICES_AS_OF, cost_usd
@@ -64,8 +65,11 @@ def records_from_response(response: Any, **link: Any) -> list[AIUsage]:
 
 def persist_after_failure(session: Session, rows: list[AIUsage], **overrides: Any) -> None:
     """A failed turn's database work is rolled back, but its calls were still billed: write
-    fresh copies of their ledger rows after the rollback."""
+    fresh copies of their ledger rows after the rollback. Rows already committed (the Copilot
+    commits before each model call) are kept as they are."""
     for row in rows:
+        if sa_inspect(row).persistent:
+            continue
         data = row.model_dump(exclude={"id"})
         data.update(overrides)
         session.add(AIUsage(**data))
