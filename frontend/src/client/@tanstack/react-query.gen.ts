@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { activitiesCreateActivity, activitiesDeleteActivity, activitiesListActivities, activitiesReadActivity, activitiesUpdateActivity, boardPipelineBoard, companiesCreateCompany, companiesDeleteCompany, companiesListCompanies, companiesReadCompany, companiesUpdateCompany, configReadConfig, contactsCreateContact, contactsDeleteContact, contactsListContacts, contactsReadContact, contactsUpdateContact, copilotApproveProposal, copilotCopilotStatus, copilotListAgentRuns, copilotListConversations, copilotListProposals, copilotReadConversation, copilotRejectProposal, copilotSendMessage, copilotStartPipelineReview, dashboardLostReasons, dashboardPipelineSummary, dealsCreateDeal, dealsDealTimeline, dealsDeleteDeal, dealsListDeals, dealsMarkLost, dealsMarkWon, dealsReadDeal, dealsReopen, dealsUpdateDeal, healthHealth, loginLogin, loginLogout, loginLogoutEverywhere, loginRecoverPassword, loginResetForgottenPassword, type Options, pipelinesAddStage, pipelinesCreateLostReason, pipelinesCreatePipeline, pipelinesDeleteStage, pipelinesListLostReasons, pipelinesListPipelines, pipelinesReadPipeline, pipelinesReorderStages, pipelinesUpdateLostReason, pipelinesUpdatePipeline, pipelinesUpdateStage, settingsChangeAiSettings, settingsChangeBudgets, settingsReadAiSettings, settingsReadBudgets, tokensCreateToken, tokensListTokens, tokensRevokeToken, usageMyUsage, usageUsageSummary, usersChangePassword, usersCreateUser, usersListUsers, usersMakePasswordResetLink, usersReadMe, usersUpdateMe, usersUpdateUser, usersUserDirectory } from '../sdk.gen';
-import type { ActivitiesCreateActivityData, ActivitiesCreateActivityError, ActivitiesCreateActivityResponse, ActivitiesDeleteActivityData, ActivitiesDeleteActivityError, ActivitiesDeleteActivityResponse, ActivitiesListActivitiesData, ActivitiesListActivitiesError, ActivitiesListActivitiesResponse, ActivitiesReadActivityData, ActivitiesReadActivityError, ActivitiesReadActivityResponse, ActivitiesUpdateActivityData, ActivitiesUpdateActivityError, ActivitiesUpdateActivityResponse, BoardPipelineBoardData, BoardPipelineBoardError, BoardPipelineBoardResponse, CompaniesCreateCompanyData, CompaniesCreateCompanyError, CompaniesCreateCompanyResponse, CompaniesDeleteCompanyData, CompaniesDeleteCompanyError, CompaniesDeleteCompanyResponse, CompaniesListCompaniesData, CompaniesListCompaniesError, CompaniesListCompaniesResponse, CompaniesReadCompanyData, CompaniesReadCompanyError, CompaniesReadCompanyResponse, CompaniesUpdateCompanyData, CompaniesUpdateCompanyError, CompaniesUpdateCompanyResponse, ConfigReadConfigData, ConfigReadConfigResponse, ContactsCreateContactData, ContactsCreateContactError, ContactsCreateContactResponse, ContactsDeleteContactData, ContactsDeleteContactError, ContactsDeleteContactResponse, ContactsListContactsData, ContactsListContactsError, ContactsListContactsResponse, ContactsReadContactData, ContactsReadContactError, ContactsReadContactResponse, ContactsUpdateContactData, ContactsUpdateContactError, ContactsUpdateContactResponse, CopilotApproveProposalData, CopilotApproveProposalError, CopilotApproveProposalResponse, CopilotCopilotStatusData, CopilotCopilotStatusResponse, CopilotListAgentRunsData, CopilotListAgentRunsError, CopilotListAgentRunsResponse, CopilotListConversationsData, CopilotListConversationsResponse, CopilotListProposalsData, CopilotListProposalsError, CopilotListProposalsResponse, CopilotReadConversationData, CopilotReadConversationError, CopilotReadConversationResponse, CopilotRejectProposalData, CopilotRejectProposalError, CopilotRejectProposalResponse, CopilotSendMessageData, CopilotSendMessageError, CopilotSendMessageResponse, CopilotStartPipelineReviewData, CopilotStartPipelineReviewResponse, DashboardLostReasonsData, DashboardLostReasonsError, DashboardLostReasonsResponse, DashboardPipelineSummaryData, DashboardPipelineSummaryError, DashboardPipelineSummaryResponse, DealsCreateDealData, DealsCreateDealError, DealsCreateDealResponse, DealsDealTimelineData, DealsDealTimelineError, DealsDealTimelineResponse, DealsDeleteDealData, DealsDeleteDealError, DealsDeleteDealResponse, DealsListDealsData, DealsListDealsError, DealsListDealsResponse, DealsMarkLostData, DealsMarkLostError, DealsMarkLostResponse, DealsMarkWonData, DealsMarkWonError, DealsMarkWonResponse, DealsReadDealData, DealsReadDealError, DealsReadDealResponse, DealsReopenData, DealsReopenError, DealsReopenResponse, DealsUpdateDealData, DealsUpdateDealError, DealsUpdateDealResponse, HealthHealthData, HealthHealthResponse, LoginLoginData, LoginLoginError, LoginLoginResponse, LoginLogoutData, LoginLogoutEverywhereData, LoginLogoutEverywhereResponse, LoginLogoutResponse, LoginRecoverPasswordData, LoginRecoverPasswordError, LoginRecoverPasswordResponse, LoginResetForgottenPasswordData, LoginResetForgottenPasswordError, LoginResetForgottenPasswordResponse, PipelinesAddStageData, PipelinesAddStageError, PipelinesAddStageResponse, PipelinesCreateLostReasonData, PipelinesCreateLostReasonError, PipelinesCreateLostReasonResponse, PipelinesCreatePipelineData, PipelinesCreatePipelineError, PipelinesCreatePipelineResponse, PipelinesDeleteStageData, PipelinesDeleteStageError, PipelinesDeleteStageResponse, PipelinesListLostReasonsData, PipelinesListLostReasonsError, PipelinesListLostReasonsResponse, PipelinesListPipelinesData, PipelinesListPipelinesResponse, PipelinesReadPipelineData, PipelinesReadPipelineError, PipelinesReadPipelineResponse, PipelinesReorderStagesData, PipelinesReorderStagesError, PipelinesReorderStagesResponse, PipelinesUpdateLostReasonData, PipelinesUpdateLostReasonError, PipelinesUpdateLostReasonResponse, PipelinesUpdatePipelineData, PipelinesUpdatePipelineError, PipelinesUpdatePipelineResponse, PipelinesUpdateStageData, PipelinesUpdateStageError, PipelinesUpdateStageResponse, SettingsChangeAiSettingsData, SettingsChangeAiSettingsError, SettingsChangeAiSettingsResponse, SettingsChangeBudgetsData, SettingsChangeBudgetsError, SettingsChangeBudgetsResponse, SettingsReadAiSettingsData, SettingsReadAiSettingsResponse, SettingsReadBudgetsData, SettingsReadBudgetsResponse, TokensCreateTokenData, TokensCreateTokenError, TokensCreateTokenResponse, TokensListTokensData, TokensListTokensResponse, TokensRevokeTokenData, TokensRevokeTokenError, TokensRevokeTokenResponse, UsageMyUsageData, UsageMyUsageError, UsageMyUsageResponse, UsageUsageSummaryData, UsageUsageSummaryError, UsageUsageSummaryResponse, UsersChangePasswordData, UsersChangePasswordError, UsersChangePasswordResponse, UsersCreateUserData, UsersCreateUserError, UsersCreateUserResponse, UsersListUsersData, UsersListUsersError, UsersListUsersResponse, UsersMakePasswordResetLinkData, UsersMakePasswordResetLinkError, UsersMakePasswordResetLinkResponse, UsersReadMeData, UsersReadMeResponse, UsersUpdateMeData, UsersUpdateMeError, UsersUpdateMeResponse, UsersUpdateUserData, UsersUpdateUserError, UsersUpdateUserResponse, UsersUserDirectoryData, UsersUserDirectoryResponse } from '../types.gen';
+import { activitiesCreateActivity, activitiesDeleteActivity, activitiesListActivities, activitiesReadActivity, activitiesUpdateActivity, boardPipelineBoard, companiesCompanyHistory, companiesCreateCompany, companiesDeleteCompany, companiesListCompanies, companiesReadCompany, companiesUpdateCompany, configReadConfig, contactsContactHistory, contactsCreateContact, contactsDeleteContact, contactsListContacts, contactsReadContact, contactsUpdateContact, copilotApproveProposal, copilotCopilotStatus, copilotListAgentRuns, copilotListConversations, copilotListProposals, copilotReadConversation, copilotRejectProposal, copilotSendMessage, copilotStartPipelineReview, dashboardLostReasons, dashboardPipelineSummary, dealsCreateDeal, dealsDealTimeline, dealsDeleteDeal, dealsListDeals, dealsMarkLost, dealsMarkWon, dealsReadDeal, dealsReopen, dealsUpdateDeal, healthHealth, loginLogin, loginLogout, loginLogoutEverywhere, loginRecoverPassword, loginResetForgottenPassword, type Options, pipelinesAddStage, pipelinesCreateLostReason, pipelinesCreatePipeline, pipelinesDeleteStage, pipelinesListLostReasons, pipelinesListPipelines, pipelinesReadPipeline, pipelinesReorderStages, pipelinesUpdateLostReason, pipelinesUpdatePipeline, pipelinesUpdateStage, settingsChangeAiSettings, settingsChangeBudgets, settingsReadAiSettings, settingsReadBudgets, tokensCreateToken, tokensListTokens, tokensRevokeToken, trashDeleteForGood, trashListTrash, trashRestore, usageMyUsage, usageUsageSummary, usersChangePassword, usersCreateUser, usersListUsers, usersMakePasswordResetLink, usersReadMe, usersUpdateMe, usersUpdateUser, usersUserDirectory } from '../sdk.gen';
+import type { ActivitiesCreateActivityData, ActivitiesCreateActivityError, ActivitiesCreateActivityResponse, ActivitiesDeleteActivityData, ActivitiesDeleteActivityError, ActivitiesDeleteActivityResponse, ActivitiesListActivitiesData, ActivitiesListActivitiesError, ActivitiesListActivitiesResponse, ActivitiesReadActivityData, ActivitiesReadActivityError, ActivitiesReadActivityResponse, ActivitiesUpdateActivityData, ActivitiesUpdateActivityError, ActivitiesUpdateActivityResponse, BoardPipelineBoardData, BoardPipelineBoardError, BoardPipelineBoardResponse, CompaniesCompanyHistoryData, CompaniesCompanyHistoryError, CompaniesCompanyHistoryResponse, CompaniesCreateCompanyData, CompaniesCreateCompanyError, CompaniesCreateCompanyResponse, CompaniesDeleteCompanyData, CompaniesDeleteCompanyError, CompaniesDeleteCompanyResponse, CompaniesListCompaniesData, CompaniesListCompaniesError, CompaniesListCompaniesResponse, CompaniesReadCompanyData, CompaniesReadCompanyError, CompaniesReadCompanyResponse, CompaniesUpdateCompanyData, CompaniesUpdateCompanyError, CompaniesUpdateCompanyResponse, ConfigReadConfigData, ConfigReadConfigResponse, ContactsContactHistoryData, ContactsContactHistoryError, ContactsContactHistoryResponse, ContactsCreateContactData, ContactsCreateContactError, ContactsCreateContactResponse, ContactsDeleteContactData, ContactsDeleteContactError, ContactsDeleteContactResponse, ContactsListContactsData, ContactsListContactsError, ContactsListContactsResponse, ContactsReadContactData, ContactsReadContactError, ContactsReadContactResponse, ContactsUpdateContactData, ContactsUpdateContactError, ContactsUpdateContactResponse, CopilotApproveProposalData, CopilotApproveProposalError, CopilotApproveProposalResponse, CopilotCopilotStatusData, CopilotCopilotStatusResponse, CopilotListAgentRunsData, CopilotListAgentRunsError, CopilotListAgentRunsResponse, CopilotListConversationsData, CopilotListConversationsResponse, CopilotListProposalsData, CopilotListProposalsError, CopilotListProposalsResponse, CopilotReadConversationData, CopilotReadConversationError, CopilotReadConversationResponse, CopilotRejectProposalData, CopilotRejectProposalError, CopilotRejectProposalResponse, CopilotSendMessageData, CopilotSendMessageError, CopilotSendMessageResponse, CopilotStartPipelineReviewData, CopilotStartPipelineReviewResponse, DashboardLostReasonsData, DashboardLostReasonsError, DashboardLostReasonsResponse, DashboardPipelineSummaryData, DashboardPipelineSummaryError, DashboardPipelineSummaryResponse, DealsCreateDealData, DealsCreateDealError, DealsCreateDealResponse, DealsDealTimelineData, DealsDealTimelineError, DealsDealTimelineResponse, DealsDeleteDealData, DealsDeleteDealError, DealsDeleteDealResponse, DealsListDealsData, DealsListDealsError, DealsListDealsResponse, DealsMarkLostData, DealsMarkLostError, DealsMarkLostResponse, DealsMarkWonData, DealsMarkWonError, DealsMarkWonResponse, DealsReadDealData, DealsReadDealError, DealsReadDealResponse, DealsReopenData, DealsReopenError, DealsReopenResponse, DealsUpdateDealData, DealsUpdateDealError, DealsUpdateDealResponse, HealthHealthData, HealthHealthResponse, LoginLoginData, LoginLoginError, LoginLoginResponse, LoginLogoutData, LoginLogoutEverywhereData, LoginLogoutEverywhereResponse, LoginLogoutResponse, LoginRecoverPasswordData, LoginRecoverPasswordError, LoginRecoverPasswordResponse, LoginResetForgottenPasswordData, LoginResetForgottenPasswordError, LoginResetForgottenPasswordResponse, PipelinesAddStageData, PipelinesAddStageError, PipelinesAddStageResponse, PipelinesCreateLostReasonData, PipelinesCreateLostReasonError, PipelinesCreateLostReasonResponse, PipelinesCreatePipelineData, PipelinesCreatePipelineError, PipelinesCreatePipelineResponse, PipelinesDeleteStageData, PipelinesDeleteStageError, PipelinesDeleteStageResponse, PipelinesListLostReasonsData, PipelinesListLostReasonsError, PipelinesListLostReasonsResponse, PipelinesListPipelinesData, PipelinesListPipelinesResponse, PipelinesReadPipelineData, PipelinesReadPipelineError, PipelinesReadPipelineResponse, PipelinesReorderStagesData, PipelinesReorderStagesError, PipelinesReorderStagesResponse, PipelinesUpdateLostReasonData, PipelinesUpdateLostReasonError, PipelinesUpdateLostReasonResponse, PipelinesUpdatePipelineData, PipelinesUpdatePipelineError, PipelinesUpdatePipelineResponse, PipelinesUpdateStageData, PipelinesUpdateStageError, PipelinesUpdateStageResponse, SettingsChangeAiSettingsData, SettingsChangeAiSettingsError, SettingsChangeAiSettingsResponse, SettingsChangeBudgetsData, SettingsChangeBudgetsError, SettingsChangeBudgetsResponse, SettingsReadAiSettingsData, SettingsReadAiSettingsResponse, SettingsReadBudgetsData, SettingsReadBudgetsResponse, TokensCreateTokenData, TokensCreateTokenError, TokensCreateTokenResponse, TokensListTokensData, TokensListTokensResponse, TokensRevokeTokenData, TokensRevokeTokenError, TokensRevokeTokenResponse, TrashDeleteForGoodData, TrashDeleteForGoodError, TrashDeleteForGoodResponse, TrashListTrashData, TrashListTrashResponse, TrashRestoreData, TrashRestoreError, TrashRestoreResponse, UsageMyUsageData, UsageMyUsageError, UsageMyUsageResponse, UsageUsageSummaryData, UsageUsageSummaryError, UsageUsageSummaryResponse, UsersChangePasswordData, UsersChangePasswordError, UsersChangePasswordResponse, UsersCreateUserData, UsersCreateUserError, UsersCreateUserResponse, UsersListUsersData, UsersListUsersError, UsersListUsersResponse, UsersMakePasswordResetLinkData, UsersMakePasswordResetLinkError, UsersMakePasswordResetLinkResponse, UsersReadMeData, UsersReadMeResponse, UsersUpdateMeData, UsersUpdateMeError, UsersUpdateMeResponse, UsersUpdateUserData, UsersUpdateUserError, UsersUpdateUserResponse, UsersUserDirectoryData, UsersUserDirectoryResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -399,6 +399,9 @@ export const companiesCreateCompanyMutation = (options?: Partial<Options<Compani
 
 /**
  * Delete Company
+ *
+ * Moves the company to the trash; its people, deals and activities keep the link, which
+ * comes back if it's restored.
  */
 export const companiesDeleteCompanyMutation = (options?: Partial<Options<CompaniesDeleteCompanyData>>): UseMutationOptions<CompaniesDeleteCompanyResponse, CompaniesDeleteCompanyError, Options<CompaniesDeleteCompanyData>> => {
     const mutationOptions: UseMutationOptions<CompaniesDeleteCompanyResponse, CompaniesDeleteCompanyError, Options<CompaniesDeleteCompanyData>> = {
@@ -449,6 +452,26 @@ export const companiesUpdateCompanyMutation = (options?: Partial<Options<Compani
     return mutationOptions;
 };
 
+export const companiesCompanyHistoryQueryKey = (options: Options<CompaniesCompanyHistoryData>) => createQueryKey('companiesCompanyHistory', options);
+
+/**
+ * Company History
+ *
+ * Who created, changed, deleted or restored this company, and what changed; newest first.
+ */
+export const companiesCompanyHistoryOptions = (options: Options<CompaniesCompanyHistoryData>) => queryOptions<CompaniesCompanyHistoryResponse, CompaniesCompanyHistoryError, CompaniesCompanyHistoryResponse, ReturnType<typeof companiesCompanyHistoryQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await companiesCompanyHistory({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: companiesCompanyHistoryQueryKey(options)
+});
+
 export const contactsListContactsQueryKey = (options?: Options<ContactsListContactsData>) => createQueryKey('contactsListContacts', options);
 
 /**
@@ -486,6 +509,9 @@ export const contactsCreateContactMutation = (options?: Partial<Options<Contacts
 
 /**
  * Delete Contact
+ *
+ * Moves the contact to the trash; their deals and activities keep the link, which comes
+ * back if they're restored.
  */
 export const contactsDeleteContactMutation = (options?: Partial<Options<ContactsDeleteContactData>>): UseMutationOptions<ContactsDeleteContactResponse, ContactsDeleteContactError, Options<ContactsDeleteContactData>> => {
     const mutationOptions: UseMutationOptions<ContactsDeleteContactResponse, ContactsDeleteContactError, Options<ContactsDeleteContactData>> = {
@@ -535,6 +561,26 @@ export const contactsUpdateContactMutation = (options?: Partial<Options<Contacts
     };
     return mutationOptions;
 };
+
+export const contactsContactHistoryQueryKey = (options: Options<ContactsContactHistoryData>) => createQueryKey('contactsContactHistory', options);
+
+/**
+ * Contact History
+ *
+ * Who created, changed, deleted or restored this contact, and what changed; newest first.
+ */
+export const contactsContactHistoryOptions = (options: Options<ContactsContactHistoryData>) => queryOptions<ContactsContactHistoryResponse, ContactsContactHistoryError, ContactsContactHistoryResponse, ReturnType<typeof contactsContactHistoryQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await contactsContactHistory({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: contactsContactHistoryQueryKey(options)
+});
 
 export const pipelinesListPipelinesQueryKey = (options?: Options<PipelinesListPipelinesData>) => createQueryKey('pipelinesListPipelines', options);
 
@@ -788,6 +834,8 @@ export const dealsCreateDealMutation = (options?: Partial<Options<DealsCreateDea
 
 /**
  * Delete Deal
+ *
+ * Moves the deal to the trash, history and links intact; restoring it brings it back.
  */
 export const dealsDeleteDealMutation = (options?: Partial<Options<DealsDeleteDealData>>): UseMutationOptions<DealsDeleteDealResponse, DealsDeleteDealError, Options<DealsDeleteDealData>> => {
     const mutationOptions: UseMutationOptions<DealsDeleteDealResponse, DealsDeleteDealError, Options<DealsDeleteDealData>> = {
@@ -1314,6 +1362,66 @@ export const settingsChangeBudgetsMutation = (options?: Partial<Options<Settings
     const mutationOptions: UseMutationOptions<SettingsChangeBudgetsResponse, SettingsChangeBudgetsError, Options<SettingsChangeBudgetsData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await settingsChangeBudgets({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const trashListTrashQueryKey = (options?: Options<TrashListTrashData>) => createQueryKey('trashListTrash', options);
+
+/**
+ * List Trash
+ *
+ * Deleted deals, contacts, companies and activities, restorable until `purge_after`.
+ * Agents see their own; everyone else sees the team's.
+ */
+export const trashListTrashOptions = (options?: Options<TrashListTrashData>) => queryOptions<TrashListTrashResponse, DefaultError, TrashListTrashResponse, ReturnType<typeof trashListTrashQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await trashListTrash({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: trashListTrashQueryKey(options)
+});
+
+/**
+ * Restore
+ *
+ * Put a deleted record back, with its history and links.
+ */
+export const trashRestoreMutation = (options?: Partial<Options<TrashRestoreData>>): UseMutationOptions<TrashRestoreResponse, TrashRestoreError, Options<TrashRestoreData>> => {
+    const mutationOptions: UseMutationOptions<TrashRestoreResponse, TrashRestoreError, Options<TrashRestoreData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await trashRestore({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Delete For Good
+ *
+ * Admins: delete a record in the trash for good, now. Its history goes with it, and
+ * other records lose the link.
+ */
+export const trashDeleteForGoodMutation = (options?: Partial<Options<TrashDeleteForGoodData>>): UseMutationOptions<TrashDeleteForGoodResponse, TrashDeleteForGoodError, Options<TrashDeleteForGoodData>> => {
+    const mutationOptions: UseMutationOptions<TrashDeleteForGoodResponse, TrashDeleteForGoodError, Options<TrashDeleteForGoodData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await trashDeleteForGood({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

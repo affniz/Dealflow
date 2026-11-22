@@ -3,7 +3,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Query, Response, status
 from sqlalchemy import func
-from sqlmodel import col, or_, select
+from sqlmodel import Session, col, or_, select
 
 from app.api.access import (
     get_visible,
@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services import actions
 from app.services.names import with_activity_names
+from app.services.trash import soft_delete
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -90,26 +91,30 @@ def list_activities(
     return page
 
 
+def _public(session: Session, activity: Activity) -> ActivityPublic:
+    """With linked names; a link to a deleted record reads as none."""
+    return with_activity_names(session, [ActivityPublic.model_validate(activity)])[0]
+
+
 @router.post("", response_model=ActivityPublic, status_code=status.HTTP_201_CREATED)
-def create_activity(session: SessionDep, user: WriterUser, body: ActivityCreate) -> Activity:
-    return actions.create_activity(session, user, body)
+def create_activity(session: SessionDep, user: WriterUser, body: ActivityCreate) -> ActivityPublic:
+    return _public(session, actions.create_activity(session, user, body))
 
 
 @router.get("/{activity_id}", response_model=ActivityPublic)
-def read_activity(session: SessionDep, user: CurrentUser, activity_id: int) -> Activity:
-    return get_visible(session, Activity, activity_id, user)
+def read_activity(session: SessionDep, user: CurrentUser, activity_id: int) -> ActivityPublic:
+    return _public(session, get_visible(session, Activity, activity_id, user))
 
 
 @router.patch("/{activity_id}", response_model=ActivityPublic)
 def update_activity(
     session: SessionDep, user: WriterUser, activity_id: int, body: ActivityUpdate
-) -> Activity:
+) -> ActivityPublic:
     data = body.model_dump(exclude_unset=True)
-    return actions.update_activity(session, user, activity_id, data)
+    return _public(session, actions.update_activity(session, user, activity_id, data))
 
 
 @router.delete("/{activity_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_activity(session: SessionDep, user: WriterUser, activity_id: int) -> Response:
-    session.delete(get_visible(session, Activity, activity_id, user))
-    session.commit()
+    soft_delete(session, user, "activity", get_visible(session, Activity, activity_id, user))
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -21,6 +21,7 @@ from app.api.routes import (
     pipelines,
     settings,
     tokens,
+    trash,
     usage,
     users,
 )
@@ -74,6 +75,7 @@ for module in (
     copilot,
     usage,
     settings,
+    trash,
 ):
     api.include_router(module.router)
 app.include_router(api, prefix=config.API_V1_STR)

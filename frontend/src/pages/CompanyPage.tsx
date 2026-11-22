@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 
 import {
+  companiesCompanyHistoryOptions,
   companiesDeleteCompanyMutation,
   companiesReadCompanyOptions,
   contactsListContactsOptions,
@@ -14,6 +15,7 @@ import { CompanySheet } from "@/components/records/CompanySheet"
 import { ContactSheet } from "@/components/records/ContactSheet"
 import { DetailsCard, NotFound } from "@/components/records/Details"
 import { RecordDeals } from "@/components/records/RecordDeals"
+import { RecordHistory } from "@/components/records/RecordHistory"
 import { Button } from "@/components/ui/button"
 import { Card, Spinner } from "@/components/ui/card"
 import { ConfirmDialog } from "@/components/ui/confirm"
@@ -31,6 +33,7 @@ export function CompanyPage() {
   const toast = useToast()
   const [dialog, setDialog] = useState<"edit" | "delete" | "person" | null>(null)
   const company = useQuery(companiesReadCompanyOptions({ path: { company_id: companyId } }))
+  const history = useQuery(companiesCompanyHistoryOptions({ path: { company_id: companyId } }))
   const remove = useMutation({
     ...companiesDeleteCompanyMutation(),
     onSuccess: () => {
@@ -143,6 +146,7 @@ export function CompanyPage() {
             createdAt={c.created_at}
             updatedAt={c.updated_at}
           />
+          <RecordHistory items={history.data} isPending={history.isPending} noun="company" />
         </div>
       </div>
 
@@ -154,7 +158,7 @@ export function CompanyPage() {
         onConfirm={() => remove.mutate({ path: { company_id: c.id } })}
         busy={remove.isPending}
         title={`Delete ${c.name}?`}
-        description="Its people, deals and activities stay, without the link to this company. This can't be undone."
+        description="It moves to Recently deleted, where it can be restored, with its links to people, deals and activities, for 30 days."
         confirmLabel="Delete company"
       />
     </div>

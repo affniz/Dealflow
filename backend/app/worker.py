@@ -18,6 +18,7 @@ from app.core.db import engine
 from app.demo_data import refresh
 from app.services.daily import claim_daily_run
 from app.services.rotting import check_rotting
+from app.services.trash import purge_expired
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ celery_app.conf.update(
             "task": "dealflow.check_rotting",
             "schedule": settings.ROTTING_CHECK_INTERVAL_SECONDS,
         },
+        "purge-trash": {"task": "dealflow.purge_trash", "schedule": 3600},
         # every hour, but it only runs once a day, from PIPELINE_REVIEW_HOUR on (see
         # app.services.daily): a host that slept through that hour runs it when it wakes
         "pipeline-review": {
@@ -51,6 +53,7 @@ if settings.DEMO_MODE:
 def catch_up(**_: object) -> None:
     """Beat doesn't run what came due while the host was asleep, so do it now."""
     check_rotting_task.delay()
+    purge_trash_task.delay()
     pipeline_review_if_due_task.delay()
 
 
@@ -59,6 +62,13 @@ def check_rotting_task() -> dict[str, int]:
     with Session(engine) as session:
         result = check_rotting(session)
     return {"flagged": result.flagged, "cleared": result.cleared}
+
+
+@celery_app.task(name="dealflow.purge_trash")
+def purge_trash_task() -> dict[str, int]:
+    """Delete for good what has been in the trash longer than TRASH_DAYS."""
+    with Session(engine) as session:
+        return purge_expired(session)
 
 
 @celery_app.task(name="dealflow.pipeline_review_if_due")

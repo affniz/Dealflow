@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     TEST_DATABASE_URL: str = "postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow_test"
 
     REDIS_URL: str = "redis://localhost:6379/0"
+    # deleted deals, contacts, companies and activities can be restored for this long
+    TRASH_DAYS: int = 30
     ROTTING_CHECK_INTERVAL_SECONDS: int = 3600
 
     FIRST_OWNER_EMAIL: str = "owner@example.com"

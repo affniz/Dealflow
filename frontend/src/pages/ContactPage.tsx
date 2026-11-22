@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 
 import {
+  contactsContactHistoryOptions,
   contactsDeleteContactMutation,
   contactsReadContactOptions,
 } from "@/client/@tanstack/react-query.gen"
@@ -11,6 +12,7 @@ import { RecordActivities } from "@/components/activities/RecordActivities"
 import { ContactSheet } from "@/components/records/ContactSheet"
 import { DetailsCard, NotFound } from "@/components/records/Details"
 import { RecordDeals } from "@/components/records/RecordDeals"
+import { RecordHistory } from "@/components/records/RecordHistory"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/card"
 import { ConfirmDialog } from "@/components/ui/confirm"
@@ -28,6 +30,7 @@ export function ContactPage() {
   const toast = useToast()
   const [dialog, setDialog] = useState<"edit" | "delete" | null>(null)
   const contact = useQuery(contactsReadContactOptions({ path: { contact_id: contactId } }))
+  const history = useQuery(contactsContactHistoryOptions({ path: { contact_id: contactId } }))
   const remove = useMutation({
     ...contactsDeleteContactMutation(),
     onSuccess: () => {
@@ -161,6 +164,7 @@ export function ContactPage() {
             company={c.company}
             canWrite={canWrite}
           />
+          <RecordHistory items={history.data} isPending={history.isPending} noun="contact" />
         </div>
       </div>
 
@@ -171,7 +175,7 @@ export function ContactPage() {
         onConfirm={() => remove.mutate({ path: { contact_id: c.id } })}
         busy={remove.isPending}
         title={`Delete ${name}?`}
-        description="Their deals and activities stay, without the link to this person. This can't be undone."
+        description="It moves to Recently deleted, where it can be restored, with its links to deals and activities, for 30 days."
         confirmLabel="Delete contact"
       />
     </div>

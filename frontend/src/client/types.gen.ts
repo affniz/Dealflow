@@ -1214,6 +1214,31 @@ export type HttpValidationError = {
 };
 
 /**
+ * HistoryItem
+ */
+export type HistoryItem = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Data
+     */
+    data: {
+        [key: string]: unknown;
+    };
+    /**
+     * Created At
+     */
+    created_at: string;
+    actor?: NamedRef | null;
+};
+
+/**
  * LostReasonCreate
  */
 export type LostReasonCreate = {
@@ -1823,6 +1848,35 @@ export type Token = {
      * Token Type
      */
     token_type?: string;
+};
+
+/**
+ * TrashItem
+ *
+ * A deleted record, restorable until `purge_after`.
+ */
+export type TrashItem = {
+    /**
+     * Type
+     */
+    type: 'deal' | 'contact' | 'company' | 'activity';
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Deleted At
+     */
+    deleted_at: string;
+    deleted_by?: NamedRef | null;
+    /**
+     * Purge After
+     */
+    purge_after: string;
 };
 
 /**
@@ -2763,6 +2817,38 @@ export type CompaniesUpdateCompanyResponses = {
 
 export type CompaniesUpdateCompanyResponse = CompaniesUpdateCompanyResponses[keyof CompaniesUpdateCompanyResponses];
 
+export type CompaniesCompanyHistoryData = {
+    body?: never;
+    path: {
+        /**
+         * Company Id
+         */
+        company_id: number;
+    };
+    query?: never;
+    url: '/api/v1/companies/{company_id}/history';
+};
+
+export type CompaniesCompanyHistoryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CompaniesCompanyHistoryError = CompaniesCompanyHistoryErrors[keyof CompaniesCompanyHistoryErrors];
+
+export type CompaniesCompanyHistoryResponses = {
+    /**
+     * Response Companies-Company History
+     *
+     * Successful Response
+     */
+    200: Array<HistoryItem>;
+};
+
+export type CompaniesCompanyHistoryResponse = CompaniesCompanyHistoryResponses[keyof CompaniesCompanyHistoryResponses];
+
 export type ContactsListContactsData = {
     body?: never;
     path?: never;
@@ -2931,6 +3017,38 @@ export type ContactsUpdateContactResponses = {
 };
 
 export type ContactsUpdateContactResponse = ContactsUpdateContactResponses[keyof ContactsUpdateContactResponses];
+
+export type ContactsContactHistoryData = {
+    body?: never;
+    path: {
+        /**
+         * Contact Id
+         */
+        contact_id: number;
+    };
+    query?: never;
+    url: '/api/v1/contacts/{contact_id}/history';
+};
+
+export type ContactsContactHistoryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ContactsContactHistoryError = ContactsContactHistoryErrors[keyof ContactsContactHistoryErrors];
+
+export type ContactsContactHistoryResponses = {
+    /**
+     * Response Contacts-Contact History
+     *
+     * Successful Response
+     */
+    200: Array<HistoryItem>;
+};
+
+export type ContactsContactHistoryResponse = ContactsContactHistoryResponses[keyof ContactsContactHistoryResponses];
 
 export type PipelinesListPipelinesData = {
     body?: never;
@@ -4284,6 +4402,92 @@ export type SettingsChangeBudgetsResponses = {
 };
 
 export type SettingsChangeBudgetsResponse = SettingsChangeBudgetsResponses[keyof SettingsChangeBudgetsResponses];
+
+export type TrashListTrashData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/trash';
+};
+
+export type TrashListTrashResponses = {
+    /**
+     * Response Trash-List Trash
+     *
+     * Successful Response
+     */
+    200: Array<TrashItem>;
+};
+
+export type TrashListTrashResponse = TrashListTrashResponses[keyof TrashListTrashResponses];
+
+export type TrashRestoreData = {
+    body?: never;
+    path: {
+        /**
+         * Record Type
+         */
+        record_type: 'deal' | 'contact' | 'company' | 'activity';
+        /**
+         * Record Id
+         */
+        record_id: number;
+    };
+    query?: never;
+    url: '/api/v1/trash/{record_type}/{record_id}/restore';
+};
+
+export type TrashRestoreErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TrashRestoreError = TrashRestoreErrors[keyof TrashRestoreErrors];
+
+export type TrashRestoreResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type TrashRestoreResponse = TrashRestoreResponses[keyof TrashRestoreResponses];
+
+export type TrashDeleteForGoodData = {
+    body?: never;
+    path: {
+        /**
+         * Record Type
+         */
+        record_type: 'deal' | 'contact' | 'company' | 'activity';
+        /**
+         * Record Id
+         */
+        record_id: number;
+    };
+    query?: never;
+    url: '/api/v1/trash/{record_type}/{record_id}';
+};
+
+export type TrashDeleteForGoodErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TrashDeleteForGoodError = TrashDeleteForGoodErrors[keyof TrashDeleteForGoodErrors];
+
+export type TrashDeleteForGoodResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type TrashDeleteForGoodResponse = TrashDeleteForGoodResponses[keyof TrashDeleteForGoodResponses];
 
 export type HealthHealthData = {
     body?: never;

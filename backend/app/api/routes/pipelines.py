@@ -114,6 +114,15 @@ def delete_stage(session: SessionDep, _: AdminUser, stage_id: int) -> Response:
     stage = _get_or_404(session, Stage, stage_id)
     if session.exec(select(Deal.id).where(Deal.stage_id == stage_id)).first() is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Move this stage's deals before deleting it")
+    in_trash = (
+        select(Deal.id).where(Deal.stage_id == stage_id).execution_options(include_deleted=True)
+    )
+    if session.exec(in_trash).first() is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Deleted deals in Recently deleted are still in this stage: restore and move them, "
+            "or delete them for good, first",
+        )
     session.delete(stage)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
