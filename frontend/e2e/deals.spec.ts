@@ -44,9 +44,15 @@ test("drag a deal to the next stage on the board", async ({ page }) => {
   await page.mouse.down()
   await page.mouse.move(from.x + from.width / 2 + 20, from.y + from.height / 2, { steps: 5 })
   await page.mouse.move(to.x + to.width / 2, to.y + 120, { steps: 15 })
+  // the board moves the card before the server has saved it, so wait for the save before
+  // reloading (otherwise the reload can race it and show the old stage)
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PATCH" && /\/api\/v1\/deals\/\d+$/.test(r.url()),
+  )
   await page.mouse.up()
 
   await expect(target.getByText("Loyalty programme revamp")).toBeVisible()
+  expect((await saved).ok()).toBe(true)
   await page.reload()
   await expect(
     page.getByRole("region", { name: "Qualified" }).getByText("Loyalty programme revamp"),
