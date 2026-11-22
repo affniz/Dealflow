@@ -32,8 +32,9 @@ services:
           property: connectionString
       - key: ANTHROPIC_API_KEY
         sync: false
-      # Public demo: one-click sign-in as the sample team; passwords, users, AI settings and
-      # budgets are locked, so these caps (USD a month) are the most the AI can spend.
+      # Public demo: one-click sign-in as the sample team, reset to the sample data daily;
+      # passwords, users, AI settings and budgets are locked, so these caps (USD a month) are
+      # the most the AI can spend.
       - key: DEMO_MODE
         value: "true"
       - key: COPILOT_MONTHLY_BUDGET_USD

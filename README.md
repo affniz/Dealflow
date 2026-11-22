@@ -230,8 +230,17 @@ takes about a minute) and the free database expires after 30 days.
 **Public demo** (`DEMO_MODE=true`, on in `render.yaml`): loads the sample team on first start and
 puts one-click sign-in for each role on the sign-in page. Visitors share one database, so it
 refuses the changes that would spoil it for the next person or raise the AI bill: passwords,
-adding or changing people, AI models and budgets. That makes the budgets a hard ceiling; the
-Blueprint sets $2 a month per person for the Copilot and $3 for the pipeline agent.
+adding or changing people, deleting pipeline stages, AI models and budgets. That makes the
+budgets a hard ceiling; the Blueprint sets $2 a month per person for the Copilot and $3 for the
+pipeline agent. Everything else visitors change goes back to the sample data once a day: the
+deals, accounts, activities, chats and pipeline are wiped and loaded again, dated from that
+moment so the stalled deals stay stalled. People keep their accounts (and sign-ins), and the AI
+usage ledger is kept so the monthly budgets still hold.
+
+**Hosts that sleep**: the worker doesn't count on being awake at the hour a job is due. Every hour,
+and whenever it starts up, it checks for stalled deals, runs the morning pipeline review if it
+hasn't run yet that day and it's past `PIPELINE_REVIEW_HOUR`, and (in the demo) resets the data if
+it's a day old. On a free Render service, the first visit of the day sets all three off.
 
 ## Develop
 

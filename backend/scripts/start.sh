@@ -6,13 +6,14 @@ cd "$(dirname "$0")/.."
 
 bash scripts/prestart.sh
 case "${DEMO_MODE:-}" in
-  true | True | 1) python -m app.demo_data --if-missing ;;
+  true | True | 1) python -m app.demo_data --refresh ;;
 esac
 
 if [ "${RUN_WORKER:-true}" = "true" ]; then
-  # Stalled-deal checks and the morning pipeline review, in one small process next to the
-  # API. Where the host offers background workers, set RUN_WORKER=false and run this
-  # command as a service of its own instead.
+  # Stalled-deal checks, the morning pipeline review and the demo's daily reset, in one
+  # small process next to the API; it catches up on what came due while the host slept.
+  # Where the host offers background workers, set RUN_WORKER=false and run this command as
+  # a service of its own instead.
   celery -A app.worker worker --beat --pool solo --loglevel=info &
 fi
 

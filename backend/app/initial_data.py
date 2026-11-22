@@ -16,6 +16,12 @@ DEFAULT_LOST_REASONS = ["Price", "Chose a competitor", "No budget", "No response
 
 
 def init_db(session: Session) -> None:
+    add_missing(session)
+    session.commit()
+
+
+def add_missing(session: Session) -> None:
+    """Add whatever of the above is missing, without committing."""
     if session.exec(select(User).where(User.role == Role.owner)).first() is None:
         session.add(
             User(
@@ -34,7 +40,6 @@ def init_db(session: Session) -> None:
         session.add(pipeline)
     if session.exec(select(LostReason)).first() is None:
         session.add_all(LostReason(label=label) for label in DEFAULT_LOST_REASONS)
-    session.commit()
 
 
 if __name__ == "__main__":
