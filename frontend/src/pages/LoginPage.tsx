@@ -1,9 +1,10 @@
 import { type FormEvent, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Navigate, useLocation } from "react-router-dom"
+import { Link, Navigate, useLocation } from "react-router-dom"
 
 import { configReadConfigOptions } from "@/client/@tanstack/react-query.gen"
 import type { DemoAccount } from "@/client/types.gen"
+import { AuthShell } from "@/components/AuthShell"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input, Label } from "@/components/ui/input"
@@ -42,71 +43,74 @@ export function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-full place-items-center px-4 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2 text-2xl font-semibold tracking-tight">
-          <span className="grid size-9 place-items-center rounded-lg bg-brand-600 text-white">
-            D
-          </span>
-          Dealflow
-        </div>
-        {demo && (
-          <Card className="mb-4 p-6">
-            <h2 className="text-lg font-semibold">Try the demo</h2>
-            <p className="mt-1 text-sm text-ink-soft">
-              Sign in as someone on a sample sales team. Each role sees something different.
-              Everything is shared with other visitors and goes back to the sample data every day.
-            </p>
-            <div className="mt-4 space-y-2">
-              {demo.demo_accounts?.map((account) => (
-                <DemoButton
-                  key={account.email}
-                  account={account}
-                  disabled={busy}
-                  onClick={() => void signIn(account.email, demo.demo_password ?? "")}
-                />
-              ))}
-            </div>
-          </Card>
-        )}
-        <Card className="p-6">
-          <h1 className="text-lg font-semibold">Sign in</h1>
-          <p className="mt-1 text-sm text-ink-soft">Use your work email and password.</p>
-          <form className="mt-5 space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="username"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+    <AuthShell>
+      {demo && (
+        <Card className="mb-4 p-6">
+          <h2 className="text-lg font-semibold">Try the demo</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Sign in as someone on a sample sales team. Each role sees something different.
+            Everything is shared with other visitors and goes back to the sample data every day.
+          </p>
+          <div className="mt-4 space-y-2">
+            {demo.demo_accounts?.map((account) => (
+              <DemoButton
+                key={account.email}
+                account={account}
+                disabled={busy}
+                onClick={() => void signIn(account.email, demo.demo_password ?? "")}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            {error && (
-              <p role="alert" className="text-sm text-red-600">
-                {error}
-              </p>
-            )}
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
-            </Button>
-          </form>
+            ))}
+          </div>
         </Card>
-      </div>
-    </div>
+      )}
+      <Card className="p-6">
+        <h1 className="text-lg font-semibold">Sign in</h1>
+        <p className="mt-1 text-sm text-ink-soft">Use your work email and password.</p>
+        <form className="mt-5 space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-red-600">
+              {error}
+            </p>
+          )}
+          <Button type="submit" className="w-full" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
+      </Card>
+      {config.data && !demo && (
+        <p className="mt-4 text-center text-sm text-ink-soft">
+          {config.data.password_reset_email ? (
+            <Link to="/forgot-password" className="text-brand-700 hover:underline">
+              Forgot your password?
+            </Link>
+          ) : (
+            "Forgot your password? Ask an admin on your team for a reset link."
+          )}
+        </p>
+      )}
+    </AuthShell>
   )
 }
 

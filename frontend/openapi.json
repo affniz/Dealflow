@@ -123,6 +123,90 @@
         ]
       }
     },
+    "/api/v1/login/password-recovery": {
+      "post": {
+        "tags": [
+          "login"
+        ],
+        "summary": "Recover Password",
+        "description": "Email a password reset link. Answers the same whether or not the email has an account.",
+        "operationId": "login-recover_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordRecovery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/login/reset-password": {
+      "post": {
+        "tags": [
+          "login"
+        ],
+        "summary": "Reset Forgotten Password",
+        "description": "Set a new password with a reset link's token. Signs the person out everywhere.",
+        "operationId": "login-reset_forgotten_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordReset"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/me": {
       "get": {
         "tags": [
@@ -416,6 +500,54 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user_id}/password-reset-link": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Make Password Reset Link",
+        "description": "A one-time link (valid for a day) for this person to choose a new password; pass it\non to them yourself. Their current password keeps working until they use it.",
+        "operationId": "users-make_password_reset_link",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetLink"
                 }
               }
             }
@@ -4591,6 +4723,11 @@
             "type": "array",
             "title": "Demo Accounts",
             "default": []
+          },
+          "password_reset_email": {
+            "type": "boolean",
+            "title": "Password Reset Email",
+            "default": false
           }
         },
         "type": "object",
@@ -6497,6 +6634,61 @@
           "new_password"
         ],
         "title": "PasswordChange"
+      },
+      "PasswordRecovery": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PasswordRecovery"
+      },
+      "PasswordReset": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordReset"
+      },
+      "PasswordResetLink": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "expires_at"
+        ],
+        "title": "PasswordResetLink",
+        "description": "A reset link's secret part, shown once. The app puts it after /reset-password#."
       },
       "PipelineCreate": {
         "properties": {

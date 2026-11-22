@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Pencil, Plus } from "lucide-react"
+import { KeyRound, Pencil, Plus } from "lucide-react"
 import { type FormEvent, useState } from "react"
 
 import {
+  configReadConfigOptions,
   usersCreateUserMutation,
+  usersMakePasswordResetLinkMutation,
   usersListUsersOptions,
   usersUpdateUserMutation,
 } from "@/client/@tanstack/react-query.gen"
-import type { Role, UserPublic } from "@/client/types.gen"
+import type { PasswordResetLink, Role, UserPublic } from "@/client/types.gen"
 import { Button } from "@/components/ui/button"
 import { Badge, Card, Spinner } from "@/components/ui/card"
 import { ConfirmDialog } from "@/components/ui/confirm"
+import { CopyBlock } from "@/components/ui/copy"
+import { Dialog, DialogFooter } from "@/components/ui/dialog"
 import { Field, Select } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetFooter } from "@/components/ui/sheet"
@@ -18,6 +22,7 @@ import { apiErrorMessage, invalidate } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useUnsavedChanges } from "@/lib/sheet"
 import { useToast } from "@/lib/toast"
+import { formatDateTime } from "@/lib/time"
 import { cn, initials } from "@/lib/utils"
 
 const QUERIES = ["usersListUsers", "usersUserDirectory"]
@@ -45,6 +50,13 @@ export function TeamSettings() {
   const users = useQuery(usersListUsersOptions({ query: { limit: 500 } }))
   const [editing, setEditing] = useState<UserPublic | "new" | null>(null)
   const [deactivating, setDeactivating] = useState<UserPublic | null>(null)
+  const [resetLink, setResetLink] = useState<{ who: string; link: PasswordResetLink } | null>(null)
+  // the demo's visitors share its accounts and published password
+  const config = useQuery({ ...configReadConfigOptions(), staleTime: Infinity })
+  const makeResetLink = useMutation({
+    ...usersMakePasswordResetLinkMutation(),
+    onError: (e) => toast(apiErrorMessage(e), "error"),
+  })
   const update = useMutation({
     ...usersUpdateUserMutation(),
     onSuccess: (u) => {
@@ -134,6 +146,22 @@ export function TeamSettings() {
                       </option>
                     ))}
                   </Select>
+                  {manageable && u.is_active && config.data?.demo === false && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="A one-time link for them to choose a new password"
+                      disabled={makeResetLink.isPending}
+                      onClick={() =>
+                        makeResetLink.mutate(
+                          { path: { user_id: u.id } },
+                          { onSuccess: (link) => setResetLink({ who: name, link }) },
+                        )
+                      }
+                    >
+                      <KeyRound /> Reset link
+                    </Button>
+                  )}
                   <div className="w-24 text-right">
                     {manageable && (
                       <Button
@@ -195,6 +223,27 @@ export function TeamSettings() {
         description="They won't be able to sign in. Their contacts, companies, deals and activities stay assigned to them; you can reactivate them at any time."
         confirmLabel="Deactivate"
       />
+      <Dialog
+        open={resetLink !== null}
+        onClose={() => setResetLink(null)}
+        title={`Password reset link for ${resetLink?.who ?? ""}`}
+        description="Send it to them yourself. It works once, until the time below; their current password keeps working until they use it. Copy it now: it can't be shown again."
+      >
+        {resetLink && (
+          <div className="space-y-2">
+            <CopyBlock
+              label="Link"
+              value={`${window.location.origin}/reset-password#${resetLink.link.token}`}
+            />
+            <p className="text-xs text-ink-soft">
+              Expires {formatDateTime(resetLink.link.expires_at)}
+            </p>
+          </div>
+        )}
+        <DialogFooter>
+          <Button onClick={() => setResetLink(null)}>Done</Button>
+        </DialogFooter>
+      </Dialog>
     </section>
   )
 }

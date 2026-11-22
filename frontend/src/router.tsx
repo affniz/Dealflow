@@ -15,9 +15,12 @@ import { InboxPage } from "@/pages/InboxPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { UsagePage } from "@/pages/UsagePage"
 import { LoginPage } from "@/pages/LoginPage"
+import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/PasswordResetPages"
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
   {
     element: <RequireAuth />,
     children: [

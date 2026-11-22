@@ -11,7 +11,7 @@ router = APIRouter(prefix="/config", tags=["config"])
 def read_config() -> AppConfig:
     """Public: whether this is the demo, and the demo accounts to sign in with."""
     if not settings.DEMO_MODE:
-        return AppConfig(demo=False)
+        return AppConfig(demo=False, password_reset_email=settings.password_reset_by_email)
     return AppConfig(
         demo=True,
         demo_password=PASSWORD,

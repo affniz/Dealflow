@@ -417,6 +417,10 @@ export type AppConfig = {
      * Demo Accounts
      */
     demo_accounts?: Array<DemoAccount>;
+    /**
+     * Password Reset Email
+     */
+    password_reset_email?: boolean;
 };
 
 /**
@@ -1508,6 +1512,46 @@ export type PasswordChange = {
 };
 
 /**
+ * PasswordRecovery
+ */
+export type PasswordRecovery = {
+    /**
+     * Email
+     */
+    email: string;
+};
+
+/**
+ * PasswordReset
+ */
+export type PasswordReset = {
+    /**
+     * Token
+     */
+    token: string;
+    /**
+     * New Password
+     */
+    new_password: string;
+};
+
+/**
+ * PasswordResetLink
+ *
+ * A reset link's secret part, shown once. The app puts it after /reset-password#.
+ */
+export type PasswordResetLink = {
+    /**
+     * Token
+     */
+    token: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
+};
+
+/**
  * PipelineCreate
  */
 export type PipelineCreate = {
@@ -2228,6 +2272,56 @@ export type LoginLogoutEverywhereResponses = {
 
 export type LoginLogoutEverywhereResponse = LoginLogoutEverywhereResponses[keyof LoginLogoutEverywhereResponses];
 
+export type LoginRecoverPasswordData = {
+    body: PasswordRecovery;
+    path?: never;
+    query?: never;
+    url: '/api/v1/login/password-recovery';
+};
+
+export type LoginRecoverPasswordErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LoginRecoverPasswordError = LoginRecoverPasswordErrors[keyof LoginRecoverPasswordErrors];
+
+export type LoginRecoverPasswordResponses = {
+    /**
+     * Successful Response
+     */
+    202: Message;
+};
+
+export type LoginRecoverPasswordResponse = LoginRecoverPasswordResponses[keyof LoginRecoverPasswordResponses];
+
+export type LoginResetForgottenPasswordData = {
+    body: PasswordReset;
+    path?: never;
+    query?: never;
+    url: '/api/v1/login/reset-password';
+};
+
+export type LoginResetForgottenPasswordErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LoginResetForgottenPasswordError = LoginResetForgottenPasswordErrors[keyof LoginResetForgottenPasswordErrors];
+
+export type LoginResetForgottenPasswordResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type LoginResetForgottenPasswordResponse = LoginResetForgottenPasswordResponses[keyof LoginResetForgottenPasswordResponses];
+
 export type UsersReadMeData = {
     body?: never;
     path?: never;
@@ -2400,6 +2494,36 @@ export type UsersUpdateUserResponses = {
 };
 
 export type UsersUpdateUserResponse = UsersUpdateUserResponses[keyof UsersUpdateUserResponses];
+
+export type UsersMakePasswordResetLinkData = {
+    body?: never;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: number;
+    };
+    query?: never;
+    url: '/api/v1/users/{user_id}/password-reset-link';
+};
+
+export type UsersMakePasswordResetLinkErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UsersMakePasswordResetLinkError = UsersMakePasswordResetLinkErrors[keyof UsersMakePasswordResetLinkErrors];
+
+export type UsersMakePasswordResetLinkResponses = {
+    /**
+     * Successful Response
+     */
+    200: PasswordResetLink;
+};
+
+export type UsersMakePasswordResetLinkResponse = UsersMakePasswordResetLinkResponses[keyof UsersMakePasswordResetLinkResponses];
 
 export type TokensListTokensData = {
     body?: never;

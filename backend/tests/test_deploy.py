@@ -63,6 +63,7 @@ def test_config_outside_the_demo(client):
         "demo": False,
         "demo_password": None,
         "demo_accounts": [],
+        "password_reset_email": True,  # developing: the reset link goes to the log
     }
 
 
