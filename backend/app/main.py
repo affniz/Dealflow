@@ -25,6 +25,7 @@ from app.api.routes import (
     users,
 )
 from app.core.config import settings as config
+from app.core.headers import SecurityHeaders
 from app.mcp_server import route as mcp_route
 from app.mcp_server import running as mcp_running
 
@@ -48,6 +49,7 @@ app = FastAPI(
     docs_url="/docs",
 )
 
+app.add_middleware(SecurityHeaders)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,

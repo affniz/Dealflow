@@ -8,6 +8,7 @@ from app.models import (
     Message,
     Page,
     PasswordChange,
+    PasswordResetLink,
     Role,
     User,
     UserCreate,
@@ -18,6 +19,7 @@ from app.models import (
 )
 from app.services.auth import end_sessions
 from app.services.names import user_name
+from app.services.password_reset import ADMIN_LINK_LIFETIME, create_link
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -109,3 +111,23 @@ def update_user(session: SessionDep, actor: AdminUser, user_id: int, body: UserU
         end_sessions(session, user_id)  # a new password or deactivation signs them out
     user.sqlmodel_update(data)
     return save(session, user)
+
+
+@router.post(
+    "/{user_id}/password-reset-link",
+    response_model=PasswordResetLink,
+    dependencies=[NotInDemo],
+)
+def make_password_reset_link(
+    session: SessionDep, actor: AdminUser, user_id: int
+) -> PasswordResetLink:
+    """A one-time link (valid for a day) for this person to choose a new password; pass it
+    on to them yourself. Their current password keeps working until they use it."""
+    user = session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    _check_role_change(actor, user.role, user)
+    if not user.is_active:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Reactivate them first")
+    token, expires = create_link(session, user, ADMIN_LINK_LIFETIME, created_by=actor)
+    return PasswordResetLink(token=token, expires_at=expires)

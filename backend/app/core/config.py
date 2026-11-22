@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
@@ -28,6 +28,20 @@ class Settings(BaseSettings):
     LOGIN_WINDOW_MINUTES: int = 15
     LOGIN_MAX_FAILURES: int = 5
     LOGIN_MAX_FAILURES_PER_IP: int = 30
+
+    # Password reset emails (app.services.password_reset). Without SMTP, people get a reset
+    # link from an admin instead; while developing, the link is written to the API's log.
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_STARTTLS: bool = True  # false: SMTP over TLS from the start (usually port 465)
+    EMAILS_FROM: str | None = None  # e.g. "Dealflow <dealflow@example.com>"
+    # The app's public address, for links in emails (Render sets RENDER_EXTERNAL_URL). Never
+    # taken from the request: a forged Host header would point the link somewhere else.
+    APP_URL: str | None = Field(
+        default=None, validation_alias=AliasChoices("APP_URL", "RENDER_EXTERNAL_URL")
+    )
 
     DATABASE_URL: str = "postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow"
     # used by pytest; tables are created fresh in it, so never point this at real data
@@ -80,6 +94,15 @@ class Settings(BaseSettings):
             if url.startswith(scheme):
                 return "postgresql+psycopg://" + url.removeprefix(scheme)
         return url
+
+    @property
+    def emails_enabled(self) -> bool:
+        return bool(self.SMTP_HOST and self.EMAILS_FROM and self.APP_URL)
+
+    @property
+    def password_reset_by_email(self) -> bool:
+        """Whether "Forgot your password?" works: by email, or (developing) via the log."""
+        return self.emails_enabled or self.ENVIRONMENT == "local"
 
     @model_validator(mode="after")
     def _no_dev_secrets_in_prod(self) -> "Settings":

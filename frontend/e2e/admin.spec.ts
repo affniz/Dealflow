@@ -57,3 +57,39 @@ test("connect Claude: create a token, use it over MCP, revoke it", async ({ page
   await expect(page.getByText("No tokens yet")).toBeVisible()
   expect((await call(token)).status()).toBe(401)
 })
+
+test("an admin's reset link lets someone choose a new password", async ({ page, browser }) => {
+  const email = `reset-${Date.now().toString(36)}@example.com`
+  const made = await page.request.post("/api/v1/users", {
+    headers: { "X-Dealflow-CSRF": "1" },
+    data: { email, full_name: "Riya Reset", password: "first-password-1", role: "agent" },
+  })
+  expect(made.ok(), await made.text()).toBeTruthy()
+
+  await page.goto("/settings")
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: email })
+    .getByRole("button", { name: "Reset link" })
+    .click()
+  const link = (await page.getByLabel("Link", { exact: true }).innerText()).trim()
+  expect(link).toMatch(/\/reset-password#dfp_/)
+  await page.getByRole("button", { name: "Done" }).click()
+
+  // they open it in their own browser
+  const theirs = await browser.newPage()
+  await theirs.goto(link)
+  await expect(theirs).toHaveURL(/\/reset-password$/) // the secret leaves the address bar
+  await theirs.getByLabel("New password", { exact: true }).fill("second-password-2")
+  await theirs.getByLabel("New password again").fill("second-password-2")
+  await theirs.getByRole("button", { name: "Set new password" }).click()
+  await expect(theirs.getByRole("status")).toContainText("Password changed")
+
+  await theirs.getByRole("link", { name: "Back to sign in" }).click()
+  await expect(theirs.getByRole("heading", { name: "Sign in" })).toBeVisible()
+  await theirs.getByLabel("Email").fill(email)
+  await theirs.getByLabel("Password").fill("second-password-2")
+  await theirs.getByRole("button", { name: "Sign in" }).click()
+  await expect(theirs.getByRole("link", { name: "Riya Reset" })).toBeVisible()
+  await theirs.close()
+})

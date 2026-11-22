@@ -22,6 +22,11 @@ with a person approving every change.
   once on signing out, changing password, an admin resetting the password or deactivating the
   person, or "Sign out everywhere". Repeated wrong passwords make that address wait (5 per
   email, 30 in all, per 15 minutes)
+- Forgotten passwords: a one-time reset link, emailed from "Forgot your password?" when SMTP is
+  set up (`SMTP_*`, `EMAILS_FROM`), or made by an admin in Settings > Team and passed on by
+  hand. Using one signs the person out everywhere
+- A strict Content-Security-Policy (only the app's own scripts, styles and API), plus
+  `X-Frame-Options`, `nosniff`, `no-referrer` and, in production, HSTS
 
 **Pipeline insight**
 - **Rotting deals**: a Celery job flags open deals that have sat in one stage longer than
@@ -306,6 +311,10 @@ end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
   Requests signed in by the cookie also need an `X-Dealflow-CSRF` header to change anything.
   Failed sign-ins are counted per email *and* address, so nobody can lock someone else out by
   typing their password wrong on purpose.
+- **Reset links keep their secret out of logs.** The token goes after a `#`, which browsers
+  never send to a server, and the reset page takes it out of the address bar as it opens. Email
+  links use the configured `APP_URL`, never the request's Host header, which an attacker could
+  forge to point a victim's link at their own site.
 - **One set of tools, three ways in.** The Copilot, the pipeline agent and the MCP server share
   the same twelve tools, so Claude Code or Claude Desktop gets the same abilities and limits as
   the in-app Copilot. MCP uses personal access tokens (stored hashed, revocable) rather than

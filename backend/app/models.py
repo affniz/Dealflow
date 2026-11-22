@@ -123,11 +123,29 @@ class AppConfig(SQLModel):
     demo: bool  # a public demo: some settings are locked
     demo_password: str | None = None
     demo_accounts: list[DemoAccount] = []
+    # "Forgot your password?" sends an email; otherwise an admin gives out a reset link
+    password_reset_email: bool = False
 
 
 class PasswordChange(SQLModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordRecovery(SQLModel):
+    email: EmailStr
+
+
+class PasswordReset(SQLModel):
+    token: str = Field(max_length=200)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordResetLink(SQLModel):
+    """A reset link's secret part, shown once. The app puts it after /reset-password#."""
+
+    token: str
+    expires_at: datetime
 
 
 class UserDirectoryEntry(BaseModel):
@@ -172,6 +190,18 @@ class AuthSession(SQLModel, table=True):
     last_used_at: datetime = Field(default_factory=utcnow)
     expires_at: datetime = Field(index=True)  # the latest it can last, however much it's used
     user_agent: str | None = Field(default=None, max_length=255)
+
+
+class PasswordResetToken(SQLModel, table=True):
+    """A one-time password reset link. Only a SHA-256 hash of its secret is stored."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    token_hash: str = Field(max_length=64, unique=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime
+    # the admin who made it, or None when the person asked for it by email
+    created_by_id: int | None = Field(default=None, foreign_key="user.id")
 
 
 class LoginFailure(SQLModel, table=True):

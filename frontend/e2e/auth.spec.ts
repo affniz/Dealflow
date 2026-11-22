@@ -43,3 +43,13 @@ test("signing out everywhere ends every session", async ({ page, request }) => {
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible()
   expect((await request.get("/api/v1/users/me", { headers: auth })).status()).toBe(401)
 })
+
+test("forgot your password? asks for an email", async ({ page }) => {
+  await page.goto("/login")
+  await page.getByRole("link", { name: "Forgot your password?" }).click()
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible()
+  await page.getByLabel("Email").fill(USERS.agent)
+  await page.getByRole("button", { name: "Email me a link" }).click()
+  // the same answer whether or not the email has an account
+  await expect(page.getByRole("status")).toContainText("If that email has an account")
+})

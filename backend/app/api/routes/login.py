@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import (
@@ -12,8 +12,9 @@ from app.api.deps import (
     request_token,
 )
 from app.core.config import settings
-from app.models import Message, Token
+from app.models import Message, PasswordRecovery, PasswordReset, Token
 from app.services.auth import authenticate, end_session, end_sessions, start_session
+from app.services.password_reset import request_by_email, reset_password, send_reset_email
 
 router = APIRouter(tags=["login"])
 COOKIE_PATH = settings.API_V1_STR
@@ -76,3 +77,31 @@ def logout_everywhere(response: Response, session: SessionDep, auth: CurrentSess
     session.commit()
     response.delete_cookie(SESSION_COOKIE, path=COOKIE_PATH)
     return Message(message="Signed out everywhere")
+
+
+# In the demo everyone shares the accounts and their published password, so no resets there.
+@router.post(
+    "/login/password-recovery",
+    response_model=Message,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[NotInDemo],
+)
+def recover_password(
+    session: SessionDep, body: PasswordRecovery, background: BackgroundTasks
+) -> Message:
+    """Email a password reset link. Answers the same whether or not the email has an account."""
+    if not settings.password_reset_by_email:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Email isn't set up here. Ask an admin for a password reset link.",
+        )
+    if (to_send := request_by_email(session, body.email)) is not None:
+        background.add_task(send_reset_email, *to_send)
+    return Message(message="If that email has an account, a reset link is on its way.")
+
+
+@router.post("/login/reset-password", response_model=Message, dependencies=[NotInDemo])
+def reset_forgotten_password(session: SessionDep, body: PasswordReset) -> Message:
+    """Set a new password with a reset link's token. Signs the person out everywhere."""
+    reset_password(session, body.token, body.new_password)
+    return Message(message="Password changed. Sign in with your new password.")
