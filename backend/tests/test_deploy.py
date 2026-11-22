@@ -100,6 +100,8 @@ def test_demo_locks_what_would_break_it_for_others(client, login, demo):
             json={"copilot_per_person_usd": None, "pipeline_team_usd": None},
         ),
     ]
+    stage = client.get(f"{API}/pipelines", headers=admin).json()[0]["stages"][-1]
+    blocked.append(client.delete(f"{API}/stages/{stage['id']}", headers=admin))
     for r in blocked:
         assert r.status_code == 403, r.text
         assert "public demo" in r.json()["detail"]

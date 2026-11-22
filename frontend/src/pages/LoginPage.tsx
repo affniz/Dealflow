@@ -55,7 +55,7 @@ export function LoginPage() {
             <h2 className="text-lg font-semibold">Try the demo</h2>
             <p className="mt-1 text-sm text-ink-soft">
               Sign in as someone on a sample sales team. Each role sees something different.
-              Everything is shared with other visitors.
+              Everything is shared with other visitors and goes back to the sample data every day.
             </p>
             <div className="mt-4 space-y-2">
               {demo.demo_accounts?.map((account) => (

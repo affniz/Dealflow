@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from sqlmodel import Session, col, select
 
 from app.api.access import save
-from app.api.deps import AdminUser, CurrentUser, SessionDep
+from app.api.deps import AdminUser, CurrentUser, NotInDemo, SessionDep
 from app.models import (
     Deal,
     LostReason,
@@ -106,7 +106,10 @@ def update_stage(session: SessionDep, _: AdminUser, stage_id: int, body: StageUp
     return save(session, stage)
 
 
-@router.delete("/stages/{stage_id}", status_code=status.HTTP_204_NO_CONTENT)
+# in the demo, an emptied and deleted stage would vanish from everyone's board until the reset
+@router.delete(
+    "/stages/{stage_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[NotInDemo]
+)
 def delete_stage(session: SessionDep, _: AdminUser, stage_id: int) -> Response:
     stage = _get_or_404(session, Stage, stage_id)
     if session.exec(select(Deal.id).where(Deal.stage_id == stage_id)).first() is not None:
