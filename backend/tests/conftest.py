@@ -68,6 +68,8 @@ def login(client: TestClient, session: Session) -> Callable[..., dict[str, str]]
             session.commit()
         r = client.post(f"{API}/login/access-token", data={"username": email, "password": PASSWORD})
         assert r.status_code == 200, r.text
+        # tests sign in as several people on one client: use the bearer token, not the cookie
+        client.cookies.clear()
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     return _login

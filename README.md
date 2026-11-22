@@ -15,8 +15,13 @@ with a person approving every change.
   marked won, lost (with a reason) or reopened
 - Deal timeline: change history and activities in one list (`GET /deals/{id}/timeline`)
 - Custom fields on contacts, companies and deals (stored as JSON)
-- JWT login and four roles: **owner**, **admin** (all records, settings, users),
+- Four roles: **owner**, **admin** (all records, settings, users),
   **agent** (only their own records), **viewer** (read-only)
+- Sign-in sessions the server can end: the browser holds an httpOnly, SameSite=Strict cookie
+  (page scripts can't read it), and a session ends after 12 hours unused, after 7 days, or at
+  once on signing out, changing password, an admin resetting the password or deactivating the
+  person, or "Sign out everywhere". Repeated wrong passwords make that address wait (5 per
+  email, 30 in all, per 15 minutes)
 
 **Pipeline insight**
 - **Rotting deals**: a Celery job flags open deals that have sat in one stage longer than
@@ -294,6 +299,13 @@ end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
 - **Built for Indian B2B teams.** Rupees by default with lakh and crore, the team's time zone
   (default Asia/Kolkata) for "today" and the morning review, and the agent writes amounts the
   way the team says them.
+- **Sessions in the database, not just a signed token.** A token on its own can't be taken back
+  before it expires; here each sign-in is a row the token names, checked on every request
+  (one indexed lookup next to loading the user), so ending a session works straight away.
+  The cookie is the browser's; scripts and the API docs get the same token as a bearer header.
+  Requests signed in by the cookie also need an `X-Dealflow-CSRF` header to change anything.
+  Failed sign-ins are counted per email *and* address, so nobody can lock someone else out by
+  typing their password wrong on purpose.
 - **One set of tools, three ways in.** The Copilot, the pipeline agent and the MCP server share
   the same twelve tools, so Claude Code or Claude Desktop gets the same abilities and limits as
   the in-app Copilot. MCP uses personal access tokens (stored hashed, revocable) rather than
@@ -327,7 +339,7 @@ backend/scripts/       start (Docker), OpenAPI export, live AI check, e2e databa
 backend/tests/
 frontend/src/
   client/              generated API client and React Query hooks (don't edit by hand)
-  lib/auth.ts          sign-in token, current user, role permissions
+  lib/auth.ts          session expiry, current user, role permissions
   components/          layout, route guards, UI building blocks
   pages/               one file per screen
 frontend/e2e/          Playwright end-to-end tests

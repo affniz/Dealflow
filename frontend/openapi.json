@@ -33,6 +33,7 @@
           "login"
         ],
         "summary": "Login",
+        "description": "Sign in. Sets the session cookie the web app uses, and returns the same token for\nscripts and the API docs to send as a bearer header.\n\nToo many failed tries from one address answer 429 with a Retry-After header.",
         "operationId": "login-login",
         "requestBody": {
           "content": {
@@ -66,6 +67,60 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/logout": {
+      "post": {
+        "tags": [
+          "login"
+        ],
+        "summary": "Logout",
+        "description": "End this session. Works (and clears the cookie) even if it had already ended.",
+        "operationId": "login-logout",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/logout/everywhere": {
+      "post": {
+        "tags": [
+          "login"
+        ],
+        "summary": "Logout Everywhere",
+        "description": "End every session of the signed-in person, this one included.",
+        "operationId": "login-logout_everywhere",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/users/me": {
@@ -144,6 +199,7 @@
           "users"
         ],
         "summary": "Change Password",
+        "description": "Also signs you out everywhere else, in case someone else knew the old password.",
         "operationId": "users-change_password",
         "requestBody": {
           "content": {

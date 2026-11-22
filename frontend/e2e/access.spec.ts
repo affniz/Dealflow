@@ -1,17 +1,18 @@
 import { USERS, expect, signInAs, test } from "./fixtures.ts"
 
-test("an agent sees only their own deals", async ({ page }) => {
+test("an agent sees only their own deals", async ({ page, request }) => {
   await signInAs(page, USERS.agent)
   await page.goto("/")
   await expect(page.getByText("Fleet tracking rollout")).toBeVisible() // Arjun's
   await expect(page.getByText("Clinic scheduling suite")).toHaveCount(0) // Sana's
 
-  // and can't open a teammate's deal by its address
-  const sanas = await page.request.post("/api/v1/login/access-token", {
+  // and can't open a teammate's deal by its address (looked up as her, on a separate client
+  // so the page keeps Arjun's session cookie)
+  const sanas = await request.post("/api/v1/login/access-token", {
     form: { username: USERS.otherAgent, password: "demo-password" },
   })
   const token = ((await sanas.json()) as { access_token: string }).access_token
-  const deals = await page.request.get("/api/v1/deals?q=Clinic", {
+  const deals = await request.get("/api/v1/deals?q=Clinic", {
     headers: { Authorization: `Bearer ${token}` },
   })
   const id = ((await deals.json()) as { data: { id: number }[] }).data[0]!.id

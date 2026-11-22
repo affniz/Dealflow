@@ -3,6 +3,8 @@ import { Check, Copy, KeyRound, Plus } from "lucide-react"
 import { type FormEvent, type ReactNode, useState } from "react"
 
 import {
+  configReadConfigOptions,
+  loginLogoutEverywhereMutation,
   tokensCreateTokenMutation,
   tokensListTokensOptions,
   tokensRevokeTokenMutation,
@@ -32,6 +34,7 @@ export function AccountPage() {
       <div className="max-w-3xl space-y-8 px-4 pb-8 md:px-6">
         <Profile />
         <Password />
+        <SignOutEverywhere />
         <ConnectClaude />
       </div>
     </>
@@ -139,7 +142,11 @@ function Password() {
   }
 
   return (
-    <Section id="password" title="Password">
+    <Section
+      id="password"
+      title="Password"
+      description="Changing it signs you out on every other device."
+    >
       <Card className="p-4">
         <form onSubmit={submit} className="grid gap-4 sm:grid-cols-3">
           <Field label="Current password" htmlFor="pw-current">
@@ -186,6 +193,41 @@ function Password() {
           </div>
         </form>
       </Card>
+    </Section>
+  )
+}
+
+/** Not in the public demo: its visitors share accounts, so it would sign out everyone. */
+function SignOutEverywhere() {
+  const { logout } = useAuth()
+  const config = useQuery({ ...configReadConfigOptions(), staleTime: Infinity })
+  const [confirming, setConfirming] = useState(false)
+  const everywhere = useMutation({
+    ...loginLogoutEverywhereMutation(),
+    onSuccess: () => void logout(),
+  })
+  if (config.data?.demo !== false) return null
+
+  return (
+    <Section
+      id="sessions"
+      title="Signed-in devices"
+      description="You stay signed in on a device until you sign out there, leave it unused for 12 hours, or 7 days pass. Lost a device, or signed in somewhere you shouldn't have? Sign out everywhere at once."
+    >
+      <Card className="flex justify-end p-4">
+        <Button variant="outline" onClick={() => setConfirming(true)}>
+          Sign out everywhere
+        </Button>
+      </Card>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => everywhere.mutate({}, { onSettled: () => setConfirming(false) })}
+        busy={everywhere.isPending}
+        title="Sign out everywhere?"
+        description="Every browser and script signed in as you is signed out, this one included. Personal access tokens for Claude keep working; revoke those below."
+        confirmLabel="Sign out everywhere"
+      />
     </Section>
   )
 }

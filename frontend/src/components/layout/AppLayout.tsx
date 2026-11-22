@@ -117,7 +117,13 @@ export function AppLayout() {
             <Badge className="capitalize">{user?.role}</Badge>
           </div>
         </NavLink>
-        <Button variant="ghost" size="icon" onClick={logout} aria-label="Sign out" title="Sign out">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => void logout()}
+          aria-label="Sign out"
+          title="Sign out"
+        >
           <LogOut />
         </Button>
       </div>

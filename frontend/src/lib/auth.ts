@@ -2,36 +2,30 @@ import { createContext, useContext } from "react"
 
 import { client } from "@/client/client.gen"
 import type { UserPublic } from "@/client/types.gen"
-import { readStorage, writeStorage } from "@/lib/storage"
+import { writeStorage } from "@/lib/storage"
 
-const TOKEN_KEY = "dealflow.token"
-let token = readStorage(TOKEN_KEY)
-const listeners = new Set<() => void>()
+// sign-ins used to be kept in localStorage; remove what an older version left there
+writeStorage("dealflow.token", null)
 
-export function getToken() {
-  return token
-}
+// Signing in sets an httpOnly session cookie, which the browser sends with every API call and
+// page scripts can't read. Calls that change something also send this header: the API refuses
+// them without it, and another site can't add it.
+client.setConfig({ baseUrl: "", headers: { "X-Dealflow-CSRF": "1" } })
 
-/** Notified whenever the token changes (sign in, sign out, expiry). */
-export function onTokenChange(listener: () => void) {
-  listeners.add(listener)
+const expiredListeners = new Set<() => void>()
+
+/** Notified when an API call finds the session has ended (expired, or signed out elsewhere). */
+export function onSessionExpired(listener: () => void) {
+  expiredListeners.add(listener)
   return () => {
-    listeners.delete(listener)
+    expiredListeners.delete(listener)
   }
 }
 
-export function setToken(value: string | null) {
-  token = value
-  writeStorage(TOKEN_KEY, value)
-  listeners.forEach((l) => l())
-}
-
-// Every generated API call sends the bearer token; a 401 means it expired, so log out.
-client.setConfig({ baseUrl: "", auth: () => token ?? undefined })
 client.interceptors.response.use((response) => {
-  if (response.status === 401 && token && !response.url.endsWith("/login/access-token")) {
-    setToken(null)
-  }
+  // /users/me answers "who's signed in?" itself, and a failed sign-in isn't an expiry
+  const own = ["/login/access-token", "/users/me"].some((path) => response.url.endsWith(path))
+  if (response.status === 401 && !own) expiredListeners.forEach((l) => l())
   return response
 })
 
@@ -40,7 +34,7 @@ export type AuthContextValue = {
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

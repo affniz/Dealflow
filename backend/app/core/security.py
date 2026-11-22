@@ -1,11 +1,7 @@
 import hashlib
 import secrets
-from datetime import UTC, datetime, timedelta
 
 import bcrypt
-import jwt
-
-from app.core.config import settings
 
 ALGORITHM = "HS256"
 
@@ -21,13 +17,6 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(_pw_bytes(password), hashed.encode())
-
-
-def create_access_token(subject: str | int, expires_delta: timedelta | None = None) -> str:
-    expire = datetime.now(UTC) + (
-        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    return jwt.encode({"sub": str(subject), "exp": expire}, settings.SECRET_KEY, ALGORITHM)
 
 
 API_TOKEN_PREFIX = "dfp_"  # "Dealflow personal"; makes leaked tokens easy to spot and scan for
