@@ -69,6 +69,9 @@ def with_deal_names(session: Session, deals: list[DealPublic]) -> list[DealPubli
         d.owner = owners.get(d.owner_id)
         d.contact = _get(contacts, d.contact_id)
         d.company = _get(companies, d.company_id)
+        # a link to a deleted record reads as no link (and comes back if it's restored)
+        d.contact_id = d.contact.id if d.contact else None
+        d.company_id = d.company.id if d.company else None
     return deals
 
 
@@ -87,6 +90,9 @@ def with_activity_names(session: Session, activities: list[ActivityPublic]) -> l
         a.deal = _get(deals, a.deal_id)
         a.contact = _get(contacts, a.contact_id)
         a.company = _get(companies, a.company_id)
+        a.deal_id = a.deal.id if a.deal else None
+        a.contact_id = a.contact.id if a.contact else None
+        a.company_id = a.company.id if a.company else None
     return activities
 
 
@@ -117,6 +123,7 @@ def with_contact_details(
     for c in contacts:
         c.owner = owners.get(c.owner_id)
         c.company = _get(companies, c.company_id)
+        c.company_id = c.company.id if c.company else None
         c.open_deal_count = open_deals.get(c.id, 0)
     return contacts
 

@@ -13,7 +13,12 @@ with a person approving every change.
   search, filters and pagination
 - Pipelines with ordered stages and win probabilities; deals move between stages and are
   marked won, lost (with a reason) or reopened
-- Deal timeline: change history and activities in one list (`GET /deals/{id}/timeline`)
+- Deal timeline: change history (with old and new values) and activities in one list
+  (`GET /deals/{id}/timeline`); contacts and companies have a change history too
+  (`GET /contacts/{id}/history`, `GET /companies/{id}/history`)
+- Recently deleted: deleting a deal, contact, company or activity moves it to the trash, where
+  it can be restored with its history and links for `TRASH_DAYS` (30); then the worker deletes
+  it for good. Admins can also delete one for good sooner
 - Custom fields on contacts, companies and deals (stored as JSON)
 - Four roles: **owner**, **admin** (all records, settings, users),
   **agent** (only their own records), **viewer** (read-only)
@@ -304,6 +309,10 @@ end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
 - **Built for Indian B2B teams.** Rupees by default with lakh and crore, the team's time zone
   (default Asia/Kolkata) for "today" and the morning review, and the agent writes amounts the
   way the team says them.
+- **One rule hides deleted records.** Rather than every query remembering `deleted_at IS NULL`,
+  a SQLAlchemy `do_orm_execute` hook adds it to every ORM query (joins, counts, relationship
+  loads, the AI tools and MCP included); only the trash opts out. Links to a record in the trash
+  stay in the database but read as empty, so restoring it reconnects everything.
 - **Sessions in the database, not just a signed token.** A token on its own can't be taken back
   before it expires; here each sign-in is a row the token names, checked on every request
   (one indexed lookup next to loading the user), so ending a session works straight away.

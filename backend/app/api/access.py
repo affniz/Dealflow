@@ -24,9 +24,16 @@ def scoped(stmt: Any, model: Any, user: User) -> Any:
     return stmt if sees_all(user) else stmt.where(model.owner_id == user.id)
 
 
+def _hidden(obj: Any, user: User) -> bool:
+    # session.get can hand back a row the session already holds, so check the trash here too
+    if getattr(obj, "deleted_at", None) is not None:
+        return True
+    return not sees_all(user) and obj.owner_id != user.id
+
+
 def get_visible(session: Session, model: type[M], obj_id: int, user: User) -> M:
     obj = session.get(model, obj_id)
-    if obj is None or (not sees_all(user) and obj.owner_id != user.id):  # type: ignore[attr-defined]
+    if obj is None or _hidden(obj, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{model.__name__} not found")
     return obj
 
@@ -36,7 +43,7 @@ def check_ref(session: Session, model: type[SQLModel], obj_id: int | None, user:
     if obj_id is None:
         return
     obj = session.get(model, obj_id)
-    if obj is None or (not sees_all(user) and obj.owner_id != user.id):  # type: ignore[attr-defined]
+    if obj is None or _hidden(obj, user):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, f"{model.__name__} {obj_id} not found"
         )

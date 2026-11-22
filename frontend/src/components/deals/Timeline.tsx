@@ -10,6 +10,7 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
+  Trash2,
 } from "lucide-react"
 import { type ReactNode, useState } from "react"
 
@@ -22,14 +23,7 @@ import { useNow } from "@/lib/time"
 import { useToast } from "@/lib/toast"
 import { cn, formatMoney, timeAgo } from "@/lib/utils"
 import { VIA_LABELS } from "@/lib/sources"
-
-const FIELD_LABELS: Record<string, string> = {
-  expected_close_date: "expected close date",
-  contact_id: "contact",
-  company_id: "company",
-  owner_id: "owner",
-  custom_fields: "custom fields",
-}
+import { changeLines, fieldLabel } from "@/lib/history"
 
 export function Timeline({
   items,
@@ -145,10 +139,31 @@ function EventRow({
         </>
       )
       break
-    case "updated":
-      text = (
-        <>updated {((d.fields as string[]) ?? []).map((f) => FIELD_LABELS[f] ?? f).join(", ")}</>
+    case "updated": {
+      // older events list the changed fields; newer ones also have the old and new values
+      const lines = changeLines(d.changes)
+      text = lines.length ? (
+        <>
+          {lines[0]}
+          {lines.slice(1).map((line) => (
+            <span key={line} className="block text-ink-soft">
+              {line}
+            </span>
+          ))}
+        </>
+      ) : (
+        <>updated {((d.fields as string[]) ?? []).map(fieldLabel).join(", ")}</>
       )
+      break
+    }
+    case "deleted":
+      icon = <Trash2 />
+      tone = "danger"
+      text = <>deleted it</>
+      break
+    case "restored":
+      icon = <RotateCcw />
+      text = <>restored it from Recently deleted</>
       break
     case "won":
       icon = <CircleCheck />

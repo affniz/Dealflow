@@ -15,7 +15,8 @@ from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, EmailStr, computed_field, field_validator
 from pydantic import Field as PydField
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, Index, event
+from sqlalchemy.orm import ORMExecuteState, Session, with_loader_criteria
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -34,6 +35,26 @@ def to_utc(value: datetime | None) -> datetime | None:
 
 def json_column() -> Any:
     return Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+
+
+class SoftDeletable:
+    """Marks a table whose rows are deleted softly: `deleted_at` is set, and every ORM query
+    leaves the row out (see _hide_deleted) until it's restored or purged (app.services.trash).
+
+    Each table declares its own deleted_at / deleted_by_id columns."""
+
+
+@event.listens_for(Session, "do_orm_execute")
+def _hide_deleted(state: ORMExecuteState) -> None:
+    # One rule for every query, joins and relationship loads included, so no list, count,
+    # search, report or AI tool can forget it. The trash opts out with include_deleted.
+    if state.is_select and not state.execution_options.get("include_deleted", False):
+        state.statement = state.statement.options(
+            *(
+                with_loader_criteria(cls, cls.deleted_at.is_(None), include_aliases=True)  # type: ignore[attr-defined]
+                for cls in SoftDeletable.__subclasses__()
+            )
+        )
 
 
 T = TypeVar("T")
@@ -239,8 +260,11 @@ class CompanyBase(SQLModel):
     phone: str | None = Field(default=None, max_length=50)
 
 
-class Company(CompanyBase, table=True):
+class Company(CompanyBase, SoftDeletable, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    # set while it's in the trash (SoftDeletable); None otherwise
+    deleted_at: datetime | None = Field(default=None, index=True)
+    deleted_by_id: int | None = Field(default=None, foreign_key="user.id")
     owner_id: int = Field(foreign_key="user.id", index=True)
     custom_fields: dict[str, Any] = json_column()
     created_at: datetime = Field(default_factory=utcnow)
@@ -288,8 +312,11 @@ class ContactBase(SQLModel):
     company_id: int | None = Field(default=None, foreign_key="company.id", index=True)
 
 
-class Contact(ContactBase, table=True):
+class Contact(ContactBase, SoftDeletable, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    # set while it's in the trash (SoftDeletable); None otherwise
+    deleted_at: datetime | None = Field(default=None, index=True)
+    deleted_by_id: int | None = Field(default=None, foreign_key="user.id")
     owner_id: int = Field(foreign_key="user.id", index=True)
     custom_fields: dict[str, Any] = json_column()
     created_at: datetime = Field(default_factory=utcnow)
@@ -425,8 +452,11 @@ class DealBase(SQLModel):
     company_id: int | None = Field(default=None, foreign_key="company.id", index=True)
 
 
-class Deal(DealBase, table=True):
+class Deal(DealBase, SoftDeletable, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    # set while it's in the trash (SoftDeletable); None otherwise
+    deleted_at: datetime | None = Field(default=None, index=True)
+    deleted_by_id: int | None = Field(default=None, foreign_key="user.id")
     pipeline_id: int = Field(foreign_key="pipeline.id", index=True)
     stage_id: int = Field(foreign_key="stage.id", index=True)
     owner_id: int = Field(foreign_key="user.id", index=True)
@@ -498,9 +528,45 @@ class DealEvent(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     deal_id: int = Field(foreign_key="deal.id", index=True)
     actor_id: int | None = Field(default=None, foreign_key="user.id")
-    kind: str = Field(max_length=30)  # created, updated, stage_changed, won, lost, reopened
+    # created, updated, stage_changed, won, lost, reopened, deleted, restored
+    kind: str = Field(max_length=30)
     data: dict[str, Any] = json_column()
     created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class RecordEvent(SQLModel, table=True):
+    """Change history for contacts and companies (deals have DealEvent, with stage moves).
+
+    `data` holds {"changes": {field: [old, new]}} for updates."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    record_type: str = Field(max_length=20)  # "contact" or "company"
+    record_id: int
+    actor_id: int | None = Field(default=None, foreign_key="user.id")
+    kind: str = Field(max_length=30)  # created, updated, deleted, restored
+    data: dict[str, Any] = json_column()
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+
+    __table_args__ = (Index("ix_recordevent_record", "record_type", "record_id"),)
+
+
+class HistoryItem(BaseModel):
+    id: int
+    kind: str
+    data: dict[str, Any]
+    created_at: datetime
+    actor: NamedRef | None = None  # None for automated changes
+
+
+class TrashItem(BaseModel):
+    """A deleted record, restorable until `purge_after`."""
+
+    type: Literal["deal", "contact", "company", "activity"]
+    id: int
+    name: str
+    deleted_at: datetime
+    deleted_by: NamedRef | None = None
+    purge_after: datetime
 
 
 class DealEventPublic(SQLModel):
@@ -530,8 +596,11 @@ class ActivityBase(SQLModel):
         return to_utc(v)
 
 
-class Activity(ActivityBase, table=True):
+class Activity(ActivityBase, SoftDeletable, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    # set while it's in the trash (SoftDeletable); None otherwise
+    deleted_at: datetime | None = Field(default=None, index=True)
+    deleted_by_id: int | None = Field(default=None, foreign_key="user.id")
     owner_id: int = Field(foreign_key="user.id", index=True)
     via: str | None = Field(default=None, max_length=30)  # set when an AI agent added it
     done: bool = False

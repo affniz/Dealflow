@@ -51,6 +51,8 @@ def _proposals_public(session: Session, rows: list[AgentProposal]) -> list[Agent
         pub = AgentProposalPublic.model_validate(p)
         if p.deal_id in titles:
             pub.deal = NamedRef(id=p.deal_id, name=titles[p.deal_id])  # type: ignore[arg-type]
+        else:
+            pub.deal_id = None  # deleted: no link while it's in the trash
         out.append(pub)
     return out
 
@@ -313,6 +315,8 @@ def list_agent_runs(
         pub = AgentRunPublic.model_validate(r, update={"proposal_count": counts.get(r.id, 0)})
         if r.deal_id in titles:
             pub.deal = NamedRef(id=r.deal_id, name=titles[r.deal_id])  # type: ignore[arg-type]
+        else:
+            pub.deal_id = None  # deleted: no link while it's in the trash
         out.append(pub)
     return out
 

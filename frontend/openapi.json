@@ -950,6 +950,7 @@
           "companies"
         ],
         "summary": "Delete Company",
+        "description": "Moves the company to the trash; its people, deals and activities keep the link, which\ncomes back if it's restored.",
         "operationId": "companies-delete_company",
         "security": [
           {
@@ -970,6 +971,58 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{company_id}/history": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Company History",
+        "description": "Who created, changed, deleted or restored this company, and what changed; newest first.",
+        "operationId": "companies-company_history",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "company_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Company Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryItem"
+                  },
+                  "title": "Response Companies-Company History"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1261,6 +1314,7 @@
           "contacts"
         ],
         "summary": "Delete Contact",
+        "description": "Moves the contact to the trash; their deals and activities keep the link, which comes\nback if they're restored.",
         "operationId": "contacts-delete_contact",
         "security": [
           {
@@ -1281,6 +1335,58 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contacts/{contact_id}/history": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Contact History",
+        "description": "Who created, changed, deleted or restored this contact, and what changed; newest first.",
+        "operationId": "contacts-contact_history",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Contact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryItem"
+                  },
+                  "title": "Response Contacts-Contact History"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2276,6 +2382,7 @@
           "deals"
         ],
         "summary": "Delete Deal",
+        "description": "Moves the deal to the trash, history and links intact; restoring it brings it back.",
         "operationId": "deals-delete_deal",
         "security": [
           {
@@ -3821,6 +3928,163 @@
             "OAuth2PasswordBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/trash": {
+      "get": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "List Trash",
+        "description": "Deleted deals, contacts, companies and activities, restorable until `purge_after`.\nAgents see their own; everyone else sees the team's.",
+        "operationId": "trash-list_trash",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrashItem"
+                  },
+                  "type": "array",
+                  "title": "Response Trash-List Trash"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/trash/{record_type}/{record_id}/restore": {
+      "post": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Restore",
+        "description": "Put a deleted record back, with its history and links.",
+        "operationId": "trash-restore",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "record_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "deal",
+                "contact",
+                "company",
+                "activity"
+              ],
+              "type": "string",
+              "title": "Record Type"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trash/{record_type}/{record_id}": {
+      "delete": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Delete For Good",
+        "description": "Admins: delete a record in the trash for good, now. Its history goes with it, and\nother records lose the link.",
+        "operationId": "trash-delete_for_good",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "record_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "deal",
+                "contact",
+                "company",
+                "activity"
+              ],
+              "type": "string",
+              "title": "Record Type"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/health": {
@@ -6214,6 +6478,46 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HistoryItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "data",
+          "created_at"
+        ],
+        "title": "HistoryItem"
+      },
       "LostReasonCreate": {
         "properties": {
           "label": {
@@ -7111,6 +7415,58 @@
           "access_token"
         ],
         "title": "Token"
+      },
+      "TrashItem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "deal",
+              "contact",
+              "company",
+              "activity"
+            ],
+            "title": "Type"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deleted At"
+          },
+          "deleted_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purge_after": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Purge After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "name",
+          "deleted_at",
+          "purge_after"
+        ],
+        "title": "TrashItem",
+        "description": "A deleted record, restorable until `purge_after`."
       },
       "UsageSummary": {
         "properties": {

@@ -15,16 +15,16 @@ from app.api.access import (
 )
 from app.api.deps import CurrentUser, SessionDep, WriterUser
 from app.models import (
-    Activity,
     Company,
     Contact,
     ContactCreate,
     ContactPublic,
     ContactUpdate,
-    Deal,
+    HistoryItem,
     Page,
 )
 from app.services.names import contact_public, with_contact_details
+from app.services.trash import changes, history, log_record, snapshot, soft_delete
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
@@ -71,8 +71,11 @@ def list_contacts(
 def create_contact(session: SessionDep, user: WriterUser, body: ContactCreate) -> ContactPublic:
     check_ref(session, Company, body.company_id, user)
     owner_id = resolve_owner(session, user, body.owner_id)
-    contact = save(session, Contact.model_validate(body, update={"owner_id": owner_id}))
-    return contact_public(session, user, contact)
+    contact = Contact.model_validate(body, update={"owner_id": owner_id})
+    session.add(contact)
+    session.flush()
+    log_record(session, "contact", contact.id, user, "created")  # type: ignore[arg-type]
+    return contact_public(session, user, save(session, contact))
 
 
 @router.get("/{contact_id}", response_model=ContactPublic)
@@ -88,17 +91,23 @@ def update_contact(
     data = body.model_dump(exclude_unset=True)
     if "company_id" in data and data["company_id"] != contact.company_id:
         check_ref(session, Company, data["company_id"], user)
+    before = snapshot(contact)
     apply_update(session, contact, user, data)
+    if diff := changes(before, snapshot(contact)):
+        log_record(session, "contact", contact_id, user, "updated", changes=diff)
     return contact_public(session, user, save(session, contact))
 
 
 @router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_contact(session: SessionDep, user: WriterUser, contact_id: int) -> Response:
-    contact = get_visible(session, Contact, contact_id, user)
-    for model in (Deal, Activity):
-        for row in session.exec(select(model).where(model.contact_id == contact_id)):
-            row.contact_id = None
-            session.add(row)
-    session.delete(contact)
-    session.commit()
+    """Moves the contact to the trash; their deals and activities keep the link, which comes
+    back if they're restored."""
+    soft_delete(session, user, "contact", get_visible(session, Contact, contact_id, user))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{contact_id}/history", response_model=list[HistoryItem])
+def contact_history(session: SessionDep, user: CurrentUser, contact_id: int) -> list[HistoryItem]:
+    """Who created, changed, deleted or restored this contact, and what changed; newest first."""
+    get_visible(session, Contact, contact_id, user)
+    return history(session, "contact", contact_id)

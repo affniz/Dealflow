@@ -10,8 +10,6 @@ from app.api.deps import CurrentUser, SessionDep, WriterUser
 from app.models import (
     Activity,
     ActivityPublic,
-    AgentProposal,
-    AgentRun,
     Deal,
     DealCreate,
     DealEvent,
@@ -21,11 +19,11 @@ from app.models import (
     DealStatus,
     DealUpdate,
     Page,
-    ProposalStatus,
     TimelineItem,
 )
 from app.services import actions
 from app.services.names import deal_public, user_refs, with_activity_names, with_deal_names
+from app.services.trash import soft_delete
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
@@ -104,23 +102,8 @@ def reopen(session: SessionDep, user: WriterUser, deal_id: int) -> DealPublic:
 
 @router.delete("/{deal_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_deal(session: SessionDep, user: WriterUser, deal_id: int) -> Response:
-    deal = get_visible(session, Deal, deal_id, user)
-    for event in session.exec(select(DealEvent).where(DealEvent.deal_id == deal_id)):
-        session.delete(event)
-    for run in session.exec(select(AgentRun).where(AgentRun.deal_id == deal_id)):
-        run.deal_id = None  # keep the review record, minus the link
-        session.add(run)
-    for proposal in session.exec(select(AgentProposal).where(AgentProposal.deal_id == deal_id)):
-        proposal.deal_id = None
-        if proposal.status == ProposalStatus.pending:
-            proposal.status = ProposalStatus.failed
-            proposal.error = "The deal was deleted"
-        session.add(proposal)
-    for activity in session.exec(select(Activity).where(Activity.deal_id == deal_id)):
-        activity.deal_id = None
-        session.add(activity)
-    session.delete(deal)
-    session.commit()
+    """Moves the deal to the trash, history and links intact; restoring it brings it back."""
+    soft_delete(session, user, "deal", get_visible(session, Deal, deal_id, user))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

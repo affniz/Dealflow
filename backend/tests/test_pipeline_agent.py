@@ -244,10 +244,14 @@ def test_inbox_endpoints(client, login, session, claude, team, monkeypatch):
 
 def test_deleting_a_reviewed_deal_keeps_the_run(client, session, claude, team):
     review_stalled_deals(session, claude)
-    assert client.delete(f"{API}/deals/{team['a']['id']}", headers=team["alice"]).status_code == 204
-    run = session.exec(select(AgentRun).order_by(AgentRun.id)).first()
-    session.refresh(run)
-    assert run.deal_id is None and run.summary
+    deal_id = team["a"]["id"]
+    assert client.delete(f"{API}/deals/{deal_id}", headers=team["alice"]).status_code == 204
+    runs = client.get(f"{API}/agent/runs", headers=team["alice"]).json()
+    assert runs and runs[0]["summary"] and runs[0]["deal_id"] is None  # no link while deleted
+    r = client.post(f"{API}/trash/deal/{deal_id}/restore", headers=team["alice"])
+    assert r.status_code == 200
+    runs = client.get(f"{API}/agent/runs", headers=team["alice"]).json()
+    assert runs[0]["deal_id"] == deal_id  # the link comes back with the deal
 
 
 def test_agent_is_told_the_reminder_is_not_a_plan(session, claude, team):

@@ -42,3 +42,32 @@ test("add a contact and log a task for them", async ({ page }) => {
   await page.getByRole("tab", { name: "Done & notes" }).click()
   await expect(page.getByRole("checkbox", { name: `Mark “${subject}” as not done` })).toBeChecked()
 })
+
+test("a deleted contact can be restored, and its history shows who did what", async ({ page }) => {
+  const last = unique("Iyer")
+  const made = await page.request.post("/api/v1/contacts", {
+    headers: { "X-Dealflow-CSRF": "1" },
+    data: { first_name: "Nisha", last_name: last, email: "nisha@example.com" },
+  })
+  const { id } = (await made.json()) as { id: number }
+  await page.request.patch(`/api/v1/contacts/${id}`, {
+    headers: { "X-Dealflow-CSRF": "1" },
+    data: { email: "nisha.iyer@example.com" },
+  })
+
+  await page.goto(`/contacts/${id}`)
+  await page.getByRole("button", { name: "Delete contact" }).click()
+  await page.getByRole("dialog").getByRole("button", { name: "Delete contact" }).click()
+  await expect(page).toHaveURL(/\/contacts$/)
+
+  await page.getByRole("link", { name: "Recently deleted" }).click()
+  await page.getByRole("button", { name: `Restore Nisha ${last}` }).click()
+  // restoring opens it again
+  await expect(page.getByRole("heading", { name: `Nisha ${last}` })).toBeVisible()
+  const history = page.getByRole("heading", { name: "History" }).locator("..")
+  await expect(history.getByText("restored this contact")).toBeVisible()
+  await expect(history.getByText("deleted this contact")).toBeVisible()
+  await expect(
+    history.getByText("changed email from “nisha@example.com” to “nisha.iyer@example.com”"),
+  ).toBeVisible()
+})

@@ -13,6 +13,7 @@ import { ContactsPage } from "@/pages/ContactsPage"
 import { DealPage } from "@/pages/DealPage"
 import { InboxPage } from "@/pages/InboxPage"
 import { SettingsPage } from "@/pages/SettingsPage"
+import { TrashPage } from "@/pages/TrashPage"
 import { UsagePage } from "@/pages/UsagePage"
 import { LoginPage } from "@/pages/LoginPage"
 import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/PasswordResetPages"
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
           { path: "dashboard", element: <DashboardPage /> },
           { path: "inbox", element: <InboxPage /> },
           { path: "account", element: <AccountPage /> },
+          { path: "trash", element: <TrashPage /> },
           {
             element: <RequireAdmin />,
             children: [

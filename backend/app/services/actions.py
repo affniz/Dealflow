@@ -29,6 +29,7 @@ from app.models import (
     User,
     utcnow,
 )
+from app.services.trash import changes, snapshot
 
 
 def require_writer(user: User) -> None:
@@ -125,9 +126,11 @@ def update_deal(
         deal.stage_changed_at = deal.updated_at = utcnow()
         deal.rotting_since = None
 
+    before = snapshot(deal)
     changed = apply_update(session, deal, user, data)
     if changed:
-        _log(session, deal, user, "updated", via, fields=changed)
+        diff = changes(before, snapshot(deal))
+        _log(session, deal, user, "updated", via, fields=changed, changes=diff)
     return _commit(session, deal)
 
 

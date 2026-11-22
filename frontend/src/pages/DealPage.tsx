@@ -426,7 +426,7 @@ function DeleteDialog({
       open={open}
       onClose={onClose}
       title="Delete this deal?"
-      description="Its history is deleted too. Activities stay on the contact and company. This can't be undone."
+      description="It moves to Recently deleted, where it can be restored, with its history and activities, for 30 days."
     >
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>

@@ -9,6 +9,7 @@ import {
   Settings,
   Sparkles,
   SquareKanban,
+  Trash2,
   Users,
   X,
 } from "lucide-react"
@@ -34,7 +35,7 @@ const NAV = [
 
 export function AppLayout() {
   const { user, logout } = useAuth()
-  const { isAdmin } = permissions(user)
+  const { isAdmin, canWrite } = permissions(user)
   const [open, setOpen] = useState(false)
   const [copilotOpen, setCopilotOpen] = useState(false)
   const { pathname } = useLocation()
@@ -44,13 +45,18 @@ export function AppLayout() {
   })
   const pendingCount = pending.data?.length ?? 0
   const name = user?.full_name || user?.email || ""
+  // viewers can't delete or restore, so they have no trash
+  const trash: (typeof NAV)[number][] = canWrite
+    ? [{ to: "/trash", label: "Recently deleted", icon: Trash2 }]
+    : []
   const nav = isAdmin
     ? [
         ...NAV,
+        ...trash,
         { to: "/usage", label: "AI usage", icon: Gauge },
         { to: "/settings", label: "Settings", icon: Settings },
       ]
-    : NAV
+    : [...NAV, ...trash]
 
   const sidebar = (
     <nav className="flex h-full flex-col gap-1 p-3" aria-label="Main">
