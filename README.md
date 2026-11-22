@@ -309,6 +309,12 @@ end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
 - **Built for Indian B2B teams.** Rupees by default with lakh and crore, the team's time zone
   (default Asia/Kolkata) for "today" and the morning review, and the agent writes amounts the
   way the team says them.
+- **Pages load when they're opened.** Each page is its own file (`src/router.tsx`), and React
+  and React Query get long-cached files of their own, so the sign-in page downloads about 450 kB
+  of JavaScript (135 kB gzipped) instead of the whole 620 kB app. After a deploy, a tab still
+  running the old build can't find the old page files: it reloads once at the page being opened,
+  and if that doesn't help it says the app was updated. Errors inside a page show in the page's
+  place with the navigation intact; errors elsewhere get a full-page message, never a blank screen.
 - **One rule hides deleted records.** Rather than every query remembering `deleted_at IS NULL`,
   a SQLAlchemy `do_orm_execute` hook adds it to every ORM query (joins, counts, relationship
   loads, the AI tools and MCP included); only the trash opts out. Links to a record in the trash
