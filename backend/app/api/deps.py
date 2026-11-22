@@ -1,37 +1,64 @@
 from collections.abc import Callable
 from typing import Annotated
 
-import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.db import get_session
-from app.core.security import ALGORITHM
-from app.models import Role, User
+from app.models import AuthSession, Role, User
+from app.services.auth import resolve
 
-oauth2 = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/login/access-token")
+# scripts and the API docs send the token as a bearer header; the browser app uses a cookie
+oauth2 = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/login/access-token", auto_error=False
+)
+SESSION_COOKIE = "dealflow_session"
+# A request signed in by the cookie must carry this header to change anything. Browsers only
+# send the (SameSite=Strict) cookie from this site anyway; the header is a second lock, since
+# another site can't add it without a CORS preflight that this API turns down.
+CSRF_HEADER = "X-Dealflow-CSRF"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 SessionDep = Annotated[Session, Depends(get_session)]
-TokenDep = Annotated[str, Depends(oauth2)]
 
 
-def get_current_user(session: SessionDep, token: TokenDep) -> User:
+def request_token(request: Request, bearer: str | None) -> tuple[str | None, bool]:
+    """The sign-in token on this request, and whether it came from the cookie."""
+    if bearer:
+        return bearer, False
+    cookie = request.cookies.get(SESSION_COOKIE)
+    return cookie, cookie is not None
+
+
+def get_current_session(
+    request: Request,
+    session: SessionDep,
+    bearer: Annotated[str | None, Depends(oauth2)],
+) -> AuthSession:
     unauthorized = HTTPException(
         status.HTTP_401_UNAUTHORIZED,
         "Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload["sub"])
-    except (jwt.InvalidTokenError, KeyError, ValueError):
-        raise unauthorized from None
-    user = session.get(User, user_id)
-    if user is None or not user.is_active:
+    token, from_cookie = request_token(request, bearer)
+    if token is None:
         raise unauthorized
-    return user
+    signed_in = resolve(session, token)
+    if signed_in is None:
+        raise unauthorized
+    if from_cookie and request.method not in SAFE_METHODS and not request.headers.get(CSRF_HEADER):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"Missing the {CSRF_HEADER} header")
+    request.state.user = signed_in.user
+    return signed_in.auth_session
+
+
+CurrentSession = Annotated[AuthSession, Depends(get_current_session)]
+
+
+def get_current_user(request: Request, _: CurrentSession) -> User:
+    return request.state.user
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

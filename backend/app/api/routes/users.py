@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlmodel import col, select
 
 from app.api.access import paginate, save
-from app.api.deps import AdminUser, CurrentUser, NotInDemo, SessionDep
+from app.api.deps import AdminUser, CurrentSession, CurrentUser, NotInDemo, SessionDep
 from app.core.security import hash_password, verify_password
 from app.models import (
     Message,
@@ -16,6 +16,7 @@ from app.models import (
     UserUpdate,
     UserUpdateMe,
 )
+from app.services.auth import end_sessions
 from app.services.names import user_name
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -33,10 +34,14 @@ def update_me(session: SessionDep, user: CurrentUser, body: UserUpdateMe) -> Use
 
 
 @router.post("/me/password", response_model=Message, dependencies=[NotInDemo])
-def change_password(session: SessionDep, user: CurrentUser, body: PasswordChange) -> Message:
+def change_password(
+    session: SessionDep, user: CurrentUser, auth: CurrentSession, body: PasswordChange
+) -> Message:
+    """Also signs you out everywhere else, in case someone else knew the old password."""
     if not verify_password(body.current_password, user.hashed_password):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is wrong")
     user.hashed_password = hash_password(body.new_password)
+    end_sessions(session, user.id, keep=auth.id)  # type: ignore[arg-type]
     save(session, user)
     return Message(message="Password updated")
 
@@ -100,5 +105,7 @@ def update_user(session: SessionDep, actor: AdminUser, user_id: int, body: UserU
             raise HTTPException(status.HTTP_409_CONFLICT, "A user with this email already exists")
     if "password" in data:
         data["hashed_password"] = hash_password(data.pop("password"))
+    if "hashed_password" in data or data.get("is_active") is False:
+        end_sessions(session, user_id)  # a new password or deactivation signs them out
     user.sqlmodel_update(data)
     return save(session, user)

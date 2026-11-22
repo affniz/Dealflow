@@ -2196,6 +2196,38 @@ export type LoginLoginResponses = {
 
 export type LoginLoginResponse = LoginLoginResponses[keyof LoginLoginResponses];
 
+export type LoginLogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/logout';
+};
+
+export type LoginLogoutResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type LoginLogoutResponse = LoginLogoutResponses[keyof LoginLogoutResponses];
+
+export type LoginLogoutEverywhereData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/logout/everywhere';
+};
+
+export type LoginLogoutEverywhereResponses = {
+    /**
+     * Successful Response
+     */
+    200: Message;
+};
+
+export type LoginLogoutEverywhereResponse = LoginLogoutEverywhereResponses[keyof LoginLogoutEverywhereResponses];
+
 export type UsersReadMeData = {
     body?: never;
     path?: never;

@@ -9,16 +9,13 @@ export const USERS = {
   viewer: "vikram@dealflow.dev",
 } as const
 
-/** Sign in through the API and hand the token to the app, skipping the sign-in form. */
+/** Sign in through the API, skipping the sign-in form: the session cookie it sets is shared
+ * with the page. */
 export async function signInAs(page: Page, email: string) {
   const res = await page.request.post("/api/v1/login/access-token", {
     form: { username: email, password: PASSWORD },
   })
   expect(res.ok(), await res.text()).toBeTruthy()
-  const { access_token } = (await res.json()) as { access_token: string }
-  await page.addInitScript((token) => {
-    window.localStorage.setItem("dealflow.token", token)
-  }, access_token)
 }
 
 /** A name no other test (or earlier run) has used. */

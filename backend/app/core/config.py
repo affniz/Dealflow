@@ -18,7 +18,16 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     SECRET_KEY: str = DEV_SECRET
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    # Sign-in sessions (app.services.auth): one ends after this long unused, and after
+    # SESSION_MAX_DAYS however much it's used. Signing out, changing your password or being
+    # deactivated ends sessions straight away.
+    SESSION_IDLE_MINUTES: int = 60 * 12
+    SESSION_MAX_DAYS: int = 7
+    # Failed sign-ins allowed within LOGIN_WINDOW_MINUTES, per email from one address and in
+    # all from one address, before that address has to wait.
+    LOGIN_WINDOW_MINUTES: int = 15
+    LOGIN_MAX_FAILURES: int = 5
+    LOGIN_MAX_FAILURES_PER_IP: int = 30
 
     DATABASE_URL: str = "postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow"
     # used by pytest; tables are created fresh in it, so never point this at real data

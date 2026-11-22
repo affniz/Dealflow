@@ -162,6 +162,27 @@ class ApiToken(SQLModel, table=True):
     last_used_at: datetime | None = None
 
 
+class AuthSession(SQLModel, table=True):
+    """One sign-in (a browser, or a script using the login endpoint). The token it was given
+    names this row, so deleting the row signs that browser out straight away."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    last_used_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime = Field(index=True)  # the latest it can last, however much it's used
+    user_agent: str | None = Field(default=None, max_length=255)
+
+
+class LoginFailure(SQLModel, table=True):
+    """A failed sign-in, kept for LOGIN_WINDOW_MINUTES to limit password guessing."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    email: str = Field(max_length=255, index=True)
+    ip: str = Field(max_length=64, index=True)
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
 class ApiTokenCreate(SQLModel):
     name: str = Field(min_length=1, max_length=100)
 
