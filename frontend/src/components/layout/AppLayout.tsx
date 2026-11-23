@@ -15,10 +15,11 @@ import {
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
-import { NavLink, Outlet, useLocation } from "react-router-dom"
+import { NavLink, Outlet, useLocation, useNavigation } from "react-router-dom"
 
 import { copilotListProposalsOptions } from "@/client/@tanstack/react-query.gen"
 import { CopilotPanel } from "@/components/copilot/CopilotPanel"
+import { ErrorBoundary } from "@/components/ErrorScreens"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/card"
 import { permissions, useAuth } from "@/lib/auth"
@@ -39,6 +40,8 @@ export function AppLayout() {
   const [open, setOpen] = useState(false)
   const [copilotOpen, setCopilotOpen] = useState(false)
   const { pathname } = useLocation()
+  // a page opened for the first time is still downloading
+  const loadingPage = useNavigation().state === "loading"
   const pending = useQuery({
     ...copilotListProposalsOptions({ query: { status: "pending" } }),
     refetchInterval: 60_000,
@@ -168,11 +171,20 @@ export function AppLayout() {
             <Sparkles className="text-brand-600" />
           </Button>
         </header>
-        <main className="min-h-0 flex-1 overflow-auto">
+        <main className="relative min-h-0 flex-1 overflow-auto" aria-busy={loadingPage}>
+          {loadingPage && (
+            <div
+              className="absolute inset-x-0 top-0 z-20 h-0.5 animate-pulse bg-brand-600"
+              aria-hidden
+            />
+          )}
           <Outlet />
         </main>
       </div>
-      <CopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+      {/* an error in the Copilot shows there, not across the whole app */}
+      <ErrorBoundary compact>
+        <CopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+      </ErrorBoundary>
     </div>
   )
 }
