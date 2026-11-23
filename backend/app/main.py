@@ -1,16 +1,19 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.api.routes import (
     activities,
     board,
+    client_errors,
     companies,
     contacts,
     copilot,
@@ -20,13 +23,18 @@ from app.api.routes import (
     meta,
     pipelines,
     settings,
+    system,
     tokens,
     trash,
     usage,
     users,
 )
 from app.core.config import settings as config
+from app.core.db import engine
 from app.core.headers import SecurityHeaders
+from app.core.logs import setup_logging
+from app.core.monitoring import init_sentry
+from app.core.requests import RequestLog, server_error
 from app.mcp_server import route as mcp_route
 from app.mcp_server import running as mcp_running
 
@@ -34,6 +42,10 @@ from app.mcp_server import running as mcp_running
 def operation_id(route: APIRoute) -> str:
     """Stable, readable names for the generated front-end client, e.g. deals-list_deals."""
     return f"{route.tags[0]}-{route.name}" if route.tags else route.name
+
+
+setup_logging()
+init_sentry("api")
 
 
 @asynccontextmanager
@@ -57,7 +69,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+app.add_middleware(RequestLog)  # outermost: it times and logs everything, CORS included
+app.add_exception_handler(Exception, server_error)
 
 api = APIRouter()
 for module in (
@@ -75,6 +90,8 @@ for module in (
     copilot,
     usage,
     settings,
+    system,
+    client_errors,
     trash,
 ):
     api.include_router(module.router)
@@ -84,8 +101,15 @@ app.router.routes.append(mcp_route)
 
 
 @app.get("/health", tags=["health"])
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> JSONResponse:
+    """For the host's health check: up, and able to reach the database."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        logging.getLogger(__name__).exception("Health check: can't reach the database")
+        return JSONResponse({"status": "database unreachable"}, status_code=503)
+    return JSONResponse({"status": "ok"})
 
 
 def serve_front_end(app: FastAPI, directory: str) -> None:

@@ -43,6 +43,20 @@ class Settings(BaseSettings):
         default=None, validation_alias=AliasChoices("APP_URL", "RENDER_EXTERNAL_URL")
     )
 
+    # Monitoring (app.core.logging, app.core.monitoring, app.services.jobs). Logs go to stdout,
+    # one line per event: readable text while developing, JSON in production (empty = that
+    # default). With a Sentry DSN, errors in the API, the worker and people's browsers are
+    # reported there too. Failed background jobs also email the admins when SMTP is set up.
+    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    LOG_FORMAT: Literal["text", "json"] | None = None
+    SENTRY_DSN: str | None = None
+    # share of requests and jobs to time in Sentry (0 to 1); 0 reports errors only
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(default=0.0, ge=0, le=1)
+    # which build is running, for error reports (Render sets RENDER_GIT_COMMIT)
+    RELEASE: str | None = Field(
+        default=None, validation_alias=AliasChoices("RELEASE", "RENDER_GIT_COMMIT")
+    )
+
     DATABASE_URL: str = "postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow"
     # used by pytest; tables are created fresh in it, so never point this at real data
     TEST_DATABASE_URL: str = "postgresql+psycopg://dealflow:dealflow@localhost:5432/dealflow_test"
@@ -96,6 +110,10 @@ class Settings(BaseSettings):
             if url.startswith(scheme):
                 return "postgresql+psycopg://" + url.removeprefix(scheme)
         return url
+
+    @property
+    def log_format(self) -> Literal["text", "json"]:
+        return self.LOG_FORMAT or ("json" if self.ENVIRONMENT == "production" else "text")
 
     @property
     def emails_enabled(self) -> bool:

@@ -1,10 +1,10 @@
-import { Component, type ErrorInfo, type ReactNode } from "react"
+import { Component, type ErrorInfo, type ReactNode, useEffect } from "react"
 import { isRouteErrorResponse, useRouteError } from "react-router-dom"
 
 import { AuthShell } from "@/components/AuthShell"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { isStaleBuildError } from "@/lib/errors"
+import { isStaleBuildError, reportError } from "@/lib/errors"
 
 /** What went wrong, in words a person can act on. */
 function ErrorMessage({ error, compact }: { error: unknown; compact?: boolean }) {
@@ -47,7 +47,10 @@ function ErrorMessage({ error, compact }: { error: unknown; compact?: boolean })
 /** A whole-page error: nothing else of the app could be shown. */
 export function RootError() {
   const error = useRouteError()
-  console.error(error)
+  useEffect(() => {
+    console.error(error)
+    reportError(error)
+  }, [error])
   return (
     <AuthShell>
       <Card className="p-6">
@@ -60,7 +63,10 @@ export function RootError() {
 /** A page's error, shown inside the app's layout so the navigation still works. */
 export function PageError() {
   const error = useRouteError()
-  console.error(error)
+  useEffect(() => {
+    console.error(error)
+    reportError(error)
+  }, [error])
   return (
     <div className="mx-auto max-w-xl px-4 py-10 md:px-6">
       <Card className="p-6">
@@ -86,6 +92,7 @@ export class ErrorBoundary extends Component<
 
   componentDidCatch(error: unknown, info: ErrorInfo) {
     console.error(error, info.componentStack)
+    reportError(error, info.componentStack)
   }
 
   render() {

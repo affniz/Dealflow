@@ -3930,6 +3930,68 @@
         ]
       }
     },
+    "/api/v1/system/status": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Read Status",
+        "description": "Admins: when each background job last ran and whether it worked, and anything that\nneeds attention (`problems`, which the app shows as a banner).",
+        "operationId": "system-read_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/client-errors": {
+      "post": {
+        "tags": [
+          "client-errors"
+        ],
+        "summary": "Report Client Error",
+        "description": "The app reports a crash in someone's browser. Always answers 204, even when the\nreport is dropped for coming too often.",
+        "operationId": "client-errors-report_client_error",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientError"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/trash": {
       "get": {
         "tags": [
@@ -4093,19 +4155,14 @@
           "health"
         ],
         "summary": "Health",
+        "description": "For the host's health check: up, and able to reach the database.",
         "operationId": "health-health",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Health-Health"
-                }
+                "schema": {}
               }
             }
           }
@@ -5279,6 +5336,63 @@
           "text"
         ],
         "title": "ChatItem"
+      },
+      "ClientError": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Message"
+          },
+          "stack": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stack"
+          },
+          "component_stack": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Component Stack"
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Path"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "path"
+        ],
+        "title": "ClientError",
+        "description": "An error in someone's browser, reported by the app (app.api.routes.client_errors)."
       },
       "CompanyCreate": {
         "properties": {
@@ -6518,6 +6632,123 @@
         ],
         "title": "HistoryItem"
       },
+      "JobHealth": {
+        "properties": {
+          "job": {
+            "type": "string",
+            "title": "Job"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "schedule": {
+            "type": "string",
+            "title": "Schedule"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobRunPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job",
+          "name",
+          "schedule",
+          "last_run",
+          "last_success_at"
+        ],
+        "title": "JobHealth"
+      },
+      "JobRunPublic": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "job": {
+            "type": "string",
+            "title": "Job"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "result": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job",
+          "status",
+          "started_at",
+          "finished_at",
+          "result",
+          "error"
+        ],
+        "title": "JobRunPublic"
+      },
+      "JobStatus": {
+        "type": "string",
+        "enum": [
+          "running",
+          "succeeded",
+          "warning",
+          "failed",
+          "skipped"
+        ],
+        "title": "JobStatus"
+      },
       "LostReasonCreate": {
         "properties": {
           "label": {
@@ -7344,6 +7575,49 @@
         },
         "type": "object",
         "title": "StageUpdate"
+      },
+      "SystemStatus": {
+        "properties": {
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobHealth"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
+          "recent_runs": {
+            "items": {
+              "$ref": "#/components/schemas/JobRunPublic"
+            },
+            "type": "array",
+            "title": "Recent Runs"
+          },
+          "sentry": {
+            "type": "boolean",
+            "title": "Sentry"
+          },
+          "emails": {
+            "type": "boolean",
+            "title": "Emails"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems",
+          "jobs",
+          "recent_runs",
+          "sentry",
+          "emails"
+        ],
+        "title": "SystemStatus",
+        "description": "For admins: is everything that runs in the background working?"
       },
       "TimelineItem": {
         "properties": {

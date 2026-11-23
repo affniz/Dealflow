@@ -984,3 +984,67 @@ class AISettingsView(BaseModel):
     settings: AISettings
     models: list[ModelOption]
     efforts: list[EffortLevel]
+
+
+# ---------------------------------------------------------------- monitoring
+
+
+class JobStatus(StrEnum):
+    running = "running"
+    succeeded = "succeeded"
+    warning = "warning"  # finished, but part of it failed or it stopped early
+    failed = "failed"
+    skipped = "skipped"  # nothing to do this time (another run was busy, AI not set up)
+
+
+class JobRun(SQLModel, table=True):
+    """One run of a background job (app.services.jobs), so admins can see when jobs last
+    ran and whether they worked. Kept for JOB_RUN_DAYS."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    job: str = Field(max_length=50)
+    status: JobStatus
+    started_at: datetime = Field(default_factory=utcnow, index=True)
+    finished_at: datetime | None = None
+    result: dict[str, Any] = json_column()
+    error: str | None = Field(default=None, max_length=2000)
+
+    __table_args__ = (Index("ix_jobrun_job_started", "job", "started_at"),)
+
+
+class JobRunPublic(SQLModel):
+    id: int
+    job: str
+    status: JobStatus
+    started_at: datetime
+    finished_at: datetime | None
+    result: dict[str, Any]
+    error: str | None
+
+
+class JobHealth(BaseModel):
+    job: str
+    name: str
+    schedule: str  # how often it runs, in words
+    last_run: JobRunPublic | None
+    last_success_at: datetime | None
+
+
+class SystemStatus(BaseModel):
+    """For admins: is everything that runs in the background working?"""
+
+    problems: list[str]  # what needs attention, in words; empty when all is well
+    jobs: list[JobHealth]
+    recent_runs: list[JobRunPublic]
+    sentry: bool  # whether errors are reported to Sentry
+    emails: bool  # whether failed jobs email the admins
+
+
+class ClientError(BaseModel):
+    """An error in someone's browser, reported by the app (app.api.routes.client_errors)."""
+
+    message: str = PydField(max_length=1000)
+    stack: str | None = PydField(default=None, max_length=8000)
+    component_stack: str | None = PydField(default=None, max_length=8000)
+    path: str = PydField(max_length=500)
+    release: str | None = PydField(default=None, max_length=100)

@@ -579,6 +579,34 @@ export type ChatItem = {
 };
 
 /**
+ * ClientError
+ *
+ * An error in someone's browser, reported by the app (app.api.routes.client_errors).
+ */
+export type ClientError = {
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Stack
+     */
+    stack?: string | null;
+    /**
+     * Component Stack
+     */
+    component_stack?: string | null;
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Release
+     */
+    release?: string | null;
+};
+
+/**
  * CompanyCreate
  */
 export type CompanyCreate = {
@@ -1239,6 +1267,67 @@ export type HistoryItem = {
 };
 
 /**
+ * JobHealth
+ */
+export type JobHealth = {
+    /**
+     * Job
+     */
+    job: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Schedule
+     */
+    schedule: string;
+    last_run: JobRunPublic | null;
+    /**
+     * Last Success At
+     */
+    last_success_at: string | null;
+};
+
+/**
+ * JobRunPublic
+ */
+export type JobRunPublic = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Job
+     */
+    job: string;
+    status: JobStatus;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Result
+     */
+    result: {
+        [key: string]: unknown;
+    };
+    /**
+     * Error
+     */
+    error: string | null;
+};
+
+/**
+ * JobStatus
+ */
+export type JobStatus = 'running' | 'succeeded' | 'warning' | 'failed' | 'skipped';
+
+/**
  * LostReasonCreate
  */
 export type LostReasonCreate = {
@@ -1817,6 +1906,34 @@ export type StageUpdate = {
      * Probability
      */
     probability?: number;
+};
+
+/**
+ * SystemStatus
+ *
+ * For admins: is everything that runs in the background working?
+ */
+export type SystemStatus = {
+    /**
+     * Problems
+     */
+    problems: Array<string>;
+    /**
+     * Jobs
+     */
+    jobs: Array<JobHealth>;
+    /**
+     * Recent Runs
+     */
+    recent_runs: Array<JobRunPublic>;
+    /**
+     * Sentry
+     */
+    sentry: boolean;
+    /**
+     * Emails
+     */
+    emails: boolean;
 };
 
 /**
@@ -4403,6 +4520,47 @@ export type SettingsChangeBudgetsResponses = {
 
 export type SettingsChangeBudgetsResponse = SettingsChangeBudgetsResponses[keyof SettingsChangeBudgetsResponses];
 
+export type SystemReadStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/status';
+};
+
+export type SystemReadStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: SystemStatus;
+};
+
+export type SystemReadStatusResponse = SystemReadStatusResponses[keyof SystemReadStatusResponses];
+
+export type ClientErrorsReportClientErrorData = {
+    body: ClientError;
+    path?: never;
+    query?: never;
+    url: '/api/v1/client-errors';
+};
+
+export type ClientErrorsReportClientErrorErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ClientErrorsReportClientErrorError = ClientErrorsReportClientErrorErrors[keyof ClientErrorsReportClientErrorErrors];
+
+export type ClientErrorsReportClientErrorResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ClientErrorsReportClientErrorResponse = ClientErrorsReportClientErrorResponses[keyof ClientErrorsReportClientErrorResponses];
+
 export type TrashListTrashData = {
     body?: never;
     path?: never;
@@ -4498,13 +4656,7 @@ export type HealthHealthData = {
 
 export type HealthHealthResponses = {
     /**
-     * Response Health-Health
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: string;
-    };
+    200: unknown;
 };
-
-export type HealthHealthResponse = HealthHealthResponses[keyof HealthHealthResponses];

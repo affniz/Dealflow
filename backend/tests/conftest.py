@@ -80,3 +80,53 @@ def stages(session: Session) -> list[int]:
     """Default Sales stage ids: Lead 10%, Qualified 25%, Proposal 50%, Negotiation 75%."""
     pipeline = session.exec(select(Pipeline)).one()
     return [s.id for s in pipeline.stages]  # type: ignore[misc]
+
+
+class FakeSMTP:
+    """Stands in for smtplib.SMTP; what it was asked to do is in `sent`."""
+
+    sent: list[object]
+
+    def __init__(self, host: str, port: int, timeout: int) -> None:
+        assert (host, port) == ("smtp.example.com", 587)
+
+    def starttls(self, context: object) -> None:
+        self.sent.append("tls")
+
+    def login(self, user: str, password: str) -> None:
+        self.sent.append(("login", user))
+
+    def send_message(self, msg: object, to_addrs: list[str] | None = None) -> None:
+        self.sent.append((msg, to_addrs))
+
+    def __enter__(self) -> "FakeSMTP":
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+
+class SMTPFixture:
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.monkeypatch = monkeypatch
+        self.sent: list[object] = []
+
+    def enable(self) -> None:
+        """Turn email on in settings, sending to FakeSMTP."""
+        from app.services import email
+
+        self.monkeypatch.setattr(FakeSMTP, "sent", self.sent, raising=False)
+        self.monkeypatch.setattr(email.smtplib, "SMTP", FakeSMTP)
+        for key, value in {
+            "SMTP_HOST": "smtp.example.com",
+            "SMTP_USER": "mailer",
+            "EMAILS_FROM": "Dealflow <dealflow@example.com>",
+            "APP_URL": "https://crm.example.com",
+        }.items():
+            self.monkeypatch.setattr(settings, key, value)
+
+
+@pytest.fixture
+def smtp(monkeypatch: pytest.MonkeyPatch) -> SMTPFixture:
+    """Email switched off until smtp.enable(); then messages land in smtp.sent."""
+    return SMTPFixture(monkeypatch)

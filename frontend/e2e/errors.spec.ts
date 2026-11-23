@@ -24,8 +24,31 @@ test("a page that crashes shows an error instead of a blank screen", async ({ pa
   await page.route("**/api/v1/dashboard/pipeline/*", (route) =>
     route.fulfill({ json: { unexpected: true } }),
   )
+  const report = page.waitForRequest("**/api/v1/client-errors")
   await page.goto("/dashboard")
   await expect(page.getByRole("alert")).toContainText("Something went wrong")
+  // and the server hears about it
+  const sent = (await report).postDataJSON()
+  expect(sent.path).toBe("/dashboard")
+  expect(sent.message).toMatch(/^TypeError: /)
   await page.getByRole("link", { name: "Pipeline" }).first().click() // the rest of the app still works
   await expect(page.getByRole("region", { name: "Lead" })).toBeVisible()
+})
+
+test("admins see when a background job is failing", async ({ page }) => {
+  await page.goto("/settings?tab=system")
+  await expect(page.getByText("Everything is working.")).toBeVisible()
+  await expect(page.getByText("Stalled-deal check")).toBeVisible()
+
+  const problem = "Trash cleanup failed on 23 Nov, 09:00 IST: RuntimeError: disk full"
+  await page.route("**/api/v1/system/status", async (route) => {
+    const status = await (await route.fetch()).json()
+    await route.fulfill({ json: { ...status, problems: [problem] } })
+  })
+  await page.goto("/")
+  const banner = page.getByRole("status").filter({ hasText: problem })
+  await expect(banner).toBeVisible()
+  await banner.getByRole("link", { name: "See system status" }).click()
+  await expect(page.getByRole("list", { name: "Needs attention" })).toContainText(problem)
+  await expect(banner).toBeHidden() // not repeated on the page that lists it
 })
