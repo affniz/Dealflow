@@ -1,5 +1,6 @@
 import {
   Building2,
+  CircleAlert,
   Gauge,
   ChartColumn,
   Inbox,
@@ -15,9 +16,12 @@ import {
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
-import { NavLink, Outlet, useLocation, useNavigation } from "react-router-dom"
+import { Link, NavLink, Outlet, useLocation, useNavigation } from "react-router-dom"
 
-import { copilotListProposalsOptions } from "@/client/@tanstack/react-query.gen"
+import {
+  copilotListProposalsOptions,
+  systemReadStatusOptions,
+} from "@/client/@tanstack/react-query.gen"
 import { CopilotPanel } from "@/components/copilot/CopilotPanel"
 import { ErrorBoundary } from "@/components/ErrorScreens"
 import { Button } from "@/components/ui/button"
@@ -178,6 +182,7 @@ export function AppLayout() {
               aria-hidden
             />
           )}
+          {isAdmin && <SystemBanner />}
           <Outlet />
         </main>
       </div>
@@ -185,6 +190,36 @@ export function AppLayout() {
       <ErrorBoundary compact>
         <CopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} />
       </ErrorBoundary>
+    </div>
+  )
+}
+
+/** Tells admins when a background job is failing or the worker has stopped. */
+function SystemBanner() {
+  const { pathname, search } = useLocation()
+  const status = useQuery({ ...systemReadStatusOptions(), refetchInterval: 5 * 60_000 })
+  const problems = status.data?.problems ?? []
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const onSystemTab = pathname === "/settings" && search.includes("tab=system")
+  if (problems.length === 0 || onSystemTab || dismissed === problems.join()) return null
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-start gap-x-3 gap-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 md:px-6 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+    >
+      <CircleAlert className="mt-0.5 size-4 shrink-0" />
+      <span className="min-w-0 flex-1 break-words">
+        {problems[0]}
+        {problems.length > 1 && ` (and ${problems.length - 1} more)`}
+      </span>
+      <span className="flex gap-3">
+        <Link to="/settings?tab=system" className="font-medium underline">
+          See system status
+        </Link>
+        <button type="button" className="underline" onClick={() => setDismissed(problems.join())}>
+          Dismiss
+        </button>
+      </span>
     </div>
   )
 }

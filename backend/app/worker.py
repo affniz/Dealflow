@@ -8,14 +8,17 @@ import logging
 
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import worker_ready
+from celery.signals import setup_logging, worker_ready
 from sqlmodel import Session
 
 from app.agent.copilot import get_client
 from app.agent.pipeline import review_stalled_deals
 from app.core.config import settings
 from app.core.db import engine
+from app.core.logs import setup_logging as configure_logging
+from app.core.monitoring import init_sentry
 from app.demo_data import refresh
+from app.services import jobs
 from app.services.daily import claim_daily_run
 from app.services.rotting import check_rotting
 from app.services.trash import purge_expired
@@ -23,6 +26,15 @@ from app.services.trash import purge_expired
 log = logging.getLogger(__name__)
 
 REVIEW_KEY = "pipeline_review_schedule"  # appsetting row: the last day the morning review ran
+
+
+@setup_logging.connect
+def _logging(**_: object) -> None:
+    """Log like the API does (app.core.logs) instead of Celery's own format."""
+    configure_logging()
+
+
+init_sentry("worker")
 
 celery_app = Celery("dealflow", broker=settings.REDIS_URL)
 celery_app.conf.update(
@@ -57,23 +69,75 @@ def catch_up(**_: object) -> None:
     pipeline_review_if_due_task.delay()
 
 
-@celery_app.task(name="dealflow.check_rotting")
-def check_rotting_task() -> dict[str, int]:
-    with Session(engine) as session:
-        result = check_rotting(session)
+# Each task records its run (app.services.jobs), so admins can see in Settings > System
+# when it last ran and whether it worked, and hear about it when it stops working.
+
+
+def check_rotting_job(session: Session) -> dict[str, object]:
+    result = check_rotting(session)
     return {"flagged": result.flagged, "cleared": result.cleared}
 
 
+def purge_trash_job(session: Session) -> dict[str, object]:
+    """Delete for good what has been in the trash longer than TRASH_DAYS, and old job
+    records."""
+    purged: dict[str, object] = dict(purge_expired(session))
+    purged["job_runs"] = jobs.prune(session)
+    return purged
+
+
+def demo_refresh_job(session: Session) -> dict[str, object]:
+    """The public demo goes back to the sample data once a day (see app.demo_data)."""
+    done = refresh(session)
+    # it's asked every hour but resets once a day; the other 23 asks did nothing
+    return {"demo_data": done} if done != "fresh" else {"skipped": "Reset already today"}
+
+
+def pipeline_review_job(session: Session) -> dict[str, object]:
+    client = get_client()
+    if client is None:
+        return {"skipped": "AI is not configured"}
+    check_rotting(session)  # make sure the stalled flags are current first
+    s = review_stalled_deals(session, client)
+    result: dict[str, object] = {
+        "reviewed": s.reviewed,
+        "failed": s.failed,
+        "proposals": s.proposals,
+    }
+    if s.skipped_reason:
+        result["skipped"] = s.skipped_reason
+    problems = []
+    if s.failed:
+        problems.append(
+            f"{s.failed} of {s.failed + s.reviewed} deal reviews failed; "
+            "their errors are in the inbox's agent runs"
+        )
+    if s.stopped_by_budget:
+        problems.append(f"it stopped early: {s.stopped_by_budget}")
+    if problems:
+        result["problem"] = "; ".join(problems)
+    return result
+
+
+@celery_app.task(name="dealflow.check_rotting")
+def check_rotting_task() -> dict[str, object]:
+    return jobs.run_job("check_rotting", check_rotting_job)
+
+
 @celery_app.task(name="dealflow.purge_trash")
-def purge_trash_task() -> dict[str, int]:
-    """Delete for good what has been in the trash longer than TRASH_DAYS."""
-    with Session(engine) as session:
-        return purge_expired(session)
+def purge_trash_task() -> dict[str, object]:
+    return jobs.run_job("purge_trash", purge_trash_job)
+
+
+@celery_app.task(name="dealflow.demo_refresh")
+def demo_refresh_task() -> dict[str, object]:
+    return jobs.run_job("demo_refresh", demo_refresh_job)
 
 
 @celery_app.task(name="dealflow.pipeline_review_if_due")
 def pipeline_review_if_due_task() -> dict[str, object]:
-    """The morning review, if it hasn't run today and it's past PIPELINE_REVIEW_HOUR."""
+    """The morning review, if it hasn't run today and it's past PIPELINE_REVIEW_HOUR.
+    Asked every hour, so only a review that actually starts is recorded."""
     if get_client() is None:
         return {"skipped": "AI is not configured"}
     with Session(engine) as session:
@@ -82,26 +146,6 @@ def pipeline_review_if_due_task() -> dict[str, object]:
     return pipeline_review_task()
 
 
-@celery_app.task(name="dealflow.demo_refresh")
-def demo_refresh_task() -> dict[str, str]:
-    """The public demo goes back to the sample data once a day (see app.demo_data)."""
-    with Session(engine) as session:
-        return {"demo_data": refresh(session)}
-
-
 @celery_app.task(name="dealflow.pipeline_review")
 def pipeline_review_task() -> dict[str, object]:
-    client = get_client()
-    if client is None:
-        log.info("Pipeline review skipped: ANTHROPIC_API_KEY isn't set")
-        return {"skipped": "AI is not configured"}
-    with Session(engine) as session:
-        check_rotting(session)  # make sure the stalled flags are current first
-        s = review_stalled_deals(session, client)
-    return {
-        "reviewed": s.reviewed,
-        "failed": s.failed,
-        "proposals": s.proposals,
-        "skipped": s.skipped_reason,
-        "stopped_by_budget": s.stopped_by_budget,
-    }
+    return jobs.run_job("pipeline_review", pipeline_review_job)

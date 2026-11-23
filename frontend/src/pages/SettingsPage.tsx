@@ -12,6 +12,7 @@ import type { AiSettings, AiSettingsView, BudgetsOutput } from "@/client/types.g
 import { PageHeader } from "@/components/layout/AppLayout"
 import { LostReasonSettings } from "@/components/settings/LostReasonSettings"
 import { PipelineSettings } from "@/components/settings/PipelineSettings"
+import { SystemSettings } from "@/components/settings/SystemSettings"
 import { TeamSettings } from "@/components/settings/TeamSettings"
 import { Button } from "@/components/ui/button"
 import { Card, Spinner } from "@/components/ui/card"
@@ -29,9 +30,13 @@ const TABS = [
   { value: "pipelines", label: "Pipelines" },
   { value: "lost-reasons", label: "Lost reasons" },
   { value: "ai", label: "AI" },
+  { value: "system", label: "System" },
 ] as const
 
-/** Admin settings: people and roles, pipelines and stages, lost reasons, AI models and budgets. */
+/**
+ * Admin settings: people and roles, pipelines and stages, lost reasons, AI models and budgets,
+ * and whether the background jobs are working.
+ */
 export function SettingsPage() {
   const { params, set } = useListParams()
   const tab = TABS.find((t) => t.value === params.get("tab"))?.value ?? "team"
@@ -66,6 +71,7 @@ export function SettingsPage() {
         {tab === "pipelines" && <PipelineSettings />}
         {tab === "lost-reasons" && <LostReasonSettings />}
         {tab === "ai" && <AiSettings />}
+        {tab === "system" && <SystemSettings />}
       </div>
     </>
   )

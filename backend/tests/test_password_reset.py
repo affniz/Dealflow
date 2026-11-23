@@ -146,43 +146,16 @@ def test_who_can_make_reset_links(client, login, session):
     assert r.status_code == 409
 
 
-def test_the_reset_email(monkeypatch, caplog):
+def test_the_reset_email(smtp, caplog):
     from app.services import password_reset
 
     # without SMTP (developing), the link goes to the log
     password_reset.send_reset_email("a@example.com", "http://localhost:5173/reset-password#dfp_x")
     assert "reset-password#dfp_x" in caplog.text
 
-    sent = []
-
-    class FakeSMTP:
-        def __init__(self, host, port, timeout):  # noqa: ANN001
-            assert (host, port) == ("smtp.example.com", 587)
-
-        def starttls(self, context):  # noqa: ANN001
-            sent.append("tls")
-
-        def login(self, user, password):  # noqa: ANN001
-            sent.append(("login", user))
-
-        def send_message(self, msg):  # noqa: ANN001
-            sent.append(msg)
-
-        def __enter__(self):  # noqa: ANN204
-            return self
-
-        def __exit__(self, *exc):  # noqa: ANN002, ANN204
-            return False
-
-    monkeypatch.setattr(password_reset.smtplib, "SMTP", FakeSMTP)
-    for key, value in {
-        "SMTP_HOST": "smtp.example.com",
-        "SMTP_USER": "mailer",
-        "EMAILS_FROM": "Dealflow <dealflow@example.com>",
-        "APP_URL": "https://crm.example.com",
-    }.items():
-        monkeypatch.setattr(settings, key, value)
+    smtp.enable()
     password_reset.send_reset_email("a@example.com", "https://crm.example.com/reset-password#t")
-    tls, login, msg = sent
+    tls, login, (msg, to) = smtp.sent
     assert tls == "tls" and login == ("login", "mailer")
+    assert to == ["a@example.com"]
     assert msg["To"] == "a@example.com" and "reset-password#t" in msg.get_content()

@@ -8,7 +8,7 @@ import { RouterProvider } from "react-router-dom"
 import { AuthProvider } from "@/components/AuthProvider"
 import { ErrorBoundary } from "@/components/ErrorScreens"
 import { ToastProvider } from "@/components/ToastProvider"
-import { reloadForUpdate } from "@/lib/errors"
+import { reloadForUpdate, reportError } from "@/lib/errors"
 import { router } from "@/router"
 
 // A page's JavaScript failed to download, most likely because a deploy replaced the build this
@@ -20,6 +20,11 @@ window.addEventListener("vite:preloadError", (event) => {
     event.preventDefault()
   }
 })
+
+// Errors nothing else caught, from event handlers, timers and promises (rendering errors are
+// reported by the error screens)
+window.addEventListener("error", (event) => reportError(event.error ?? event.message))
+window.addEventListener("unhandledrejection", (event) => reportError(event.reason))
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -12,10 +12,7 @@ line or a Referer header; the reset page posts it in the request body.
 """
 
 import logging
-import smtplib
-import ssl
 from datetime import datetime, timedelta
-from email.message import EmailMessage
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, col, delete, select
@@ -24,6 +21,7 @@ from app.core.config import settings
 from app.core.security import generate_api_token, hash_api_token, hash_password
 from app.models import LoginFailure, PasswordResetToken, User, utcnow
 from app.services.auth import end_sessions
+from app.services.email import send_email
 
 log = logging.getLogger(__name__)
 
@@ -102,30 +100,10 @@ def send_reset_email(to: str, url: str) -> None:
     if not settings.emails_enabled:
         log.warning("Email isn't set up, so here is the password reset link for %s: %s", to, url)
         return
-    msg = EmailMessage()
-    msg["Subject"] = "Reset your Dealflow password"
-    msg["From"] = settings.EMAILS_FROM
-    msg["To"] = to
-    msg.set_content(
+    send_email(
+        to,
+        "Reset your Dealflow password",
         "Someone (hopefully you) asked to reset the password for this Dealflow account.\n\n"
         f"Choose a new password here (the link works once, for the next hour):\n{url}\n\n"
-        "If it wasn't you, ignore this email; your password stays as it is.\n"
+        "If it wasn't you, ignore this email; your password stays as it is.\n",
     )
-    try:
-        context = ssl.create_default_context()
-        if settings.SMTP_STARTTLS:
-            server: smtplib.SMTP = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20)  # type: ignore[arg-type]
-            server.starttls(context=context)
-        else:
-            server = smtplib.SMTP_SSL(
-                settings.SMTP_HOST,  # type: ignore[arg-type]
-                settings.SMTP_PORT,
-                context=context,
-                timeout=20,
-            )
-        with server:
-            if settings.SMTP_USER:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD or "")
-            server.send_message(msg)
-    except (OSError, smtplib.SMTPException):
-        log.exception("Couldn't send the password reset email to %s", to)

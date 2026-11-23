@@ -1,6 +1,6 @@
 # Render Blueprint: the Dealflow web service (API + React app + worker), Postgres and Redis.
 # Deploy: Render dashboard > New > Blueprint > pick this repository. It asks for
-# ANTHROPIC_API_KEY (leave it empty to run without the AI features).
+# ANTHROPIC_API_KEY (leave it empty to run without the AI features) and SENTRY_DSN (optional).
 # The free plans suit a demo: the web service sleeps after 15 idle minutes (the first visit
 # then takes about a minute), and the free database expires after 30 days.
 
@@ -31,6 +31,9 @@ services:
           name: dealflow-redis
           property: connectionString
       - key: ANTHROPIC_API_KEY
+        sync: false
+      # optional: report errors to Sentry (leave empty to keep them in Render's logs only)
+      - key: SENTRY_DSN
         sync: false
       # Public demo: one-click sign-in as the sample team, reset to the sample data daily;
       # passwords, users, AI settings and budgets are locked, so these caps (USD a month) are

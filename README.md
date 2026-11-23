@@ -32,6 +32,9 @@ with a person approving every change.
   hand. Using one signs the person out everywhere
 - A strict Content-Security-Policy (only the app's own scripts, styles and API), plus
   `X-Frame-Options`, `nosniff`, `no-referrer` and, in production, HSTS
+- Monitoring (see [Monitoring](#monitoring)): a log line per request with its ID, every
+  background job run recorded, a System tab and banner for admins when a job fails or the
+  worker stops, failure emails, and optional error tracking with Sentry
 
 **Pipeline insight**
 - **Rotting deals**: a Celery job flags open deals that have sat in one stage longer than
@@ -257,6 +260,40 @@ and whenever it starts up, it checks for stalled deals, runs the morning pipelin
 hasn't run yet that day and it's past `PIPELINE_REVIEW_HOUR`, and (in the demo) resets the data if
 it's a day old. On a free Render service, the first visit of the day sets all three off.
 
+## Monitoring
+
+**Logs** go to stdout, where Render (or `docker logs`) collects them: readable text while
+developing, one JSON object per line in production (`LOG_FORMAT`, `LOG_LEVEL`). Every request
+gets an ID, returned in the `X-Request-ID` header and kept from a proxy in front if it sends
+one. The request's log line has its method, path (without the query string), status, time
+taken and who was signed in, and every other line logged while handling it carries the same
+ID. When a request crashes, the person sees "something went wrong" with that ID as a reference,
+never the error itself.
+
+**Background jobs** (`backend/app/services/jobs.py`): every run of the stalled-deal check,
+the trash cleanup, the morning pipeline review and the demo reset is recorded with what it did
+or the error. Admins see this under **Settings > System**, and a banner across the app tells
+them when something needs attention:
+- a job's last run failed, or finished with a problem (some deal reviews failed, or the review
+  stopped at its budget);
+- a run started over an hour ago and never finished;
+- the worker hasn't run anything for over an hour (in production, also if it never has).
+
+When a job starts failing, the owner and admins get one email (if SMTP is set up), and no more
+until it has worked again. Run records are kept for 30 days. In the Docker image, if the worker
+or the API stops, the other is stopped too, so the host restarts the container instead of
+running on without background jobs.
+
+**Errors** are reported to [Sentry](https://sentry.io) when `SENTRY_DSN` is set: crashed
+requests and failed jobs with their traceback, anything logged at ERROR, and crashes in
+people's browsers (the app sends those to `POST /api/v1/client-errors`, which logs them, so the
+Content-Security-Policy stays as it is). Nothing personal goes with them: no cookies, auth
+headers, IP addresses or request bodies. `SENTRY_TRACES_SAMPLE_RATE` (0 to 1) also times that
+share of requests and jobs. Without Sentry, all of this is still in the logs.
+
+`GET /health` answers 503 when the database can't be reached, so the host's health check
+notices.
+
 ## Develop
 
 ```bash
@@ -354,8 +391,10 @@ backend/app/
   mcp_server.py        the MCP server at /mcp (the Copilot's tools, for Claude via a token)
   services/actions.py  every change to deals and activities (used by the API and the agents)
   services/rotting.py  stalled-deal check (run by the worker)
+  services/jobs.py     records each worker job run; the admins' system status and alerts
   services/stats.py    totals and weighted forecasts
   worker.py            Celery app and schedule
+  core/logs.py         log format and the request/job each line belongs to
   initial_data.py      first owner, default "Sales" pipeline, lost reasons
   demo_data.py         demo sales team, companies, contacts and deals
 backend/alembic/       migrations
