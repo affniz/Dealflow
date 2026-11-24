@@ -69,7 +69,7 @@ def test_copilot_refuses_once_the_budget_is_used(client, login, claude, session)
     _set(client, admin, "0.01", "20")
     claude.script = [costly([{"type": "text", "text": "Sure."}])]
     first = client.post(f"{API}/copilot/messages", headers=alice, json={"text": "hi"})
-    assert first.status_code == 200  # $0 spent before this call
+    assert first.status_code == 202  # $0 spent before this call
 
     calls, conversations = len(claude.requests), session.exec(select(AgentConversation)).all()
     r = client.post(f"{API}/copilot/messages", headers=alice, json={"text": "again"})
@@ -82,7 +82,7 @@ def test_copilot_refuses_once_the_budget_is_used(client, login, claude, session)
     # limits are per person: Bob can still ask
     claude.script = [say("Hi Bob")]
     assert (
-        client.post(f"{API}/copilot/messages", headers=bob, json={"text": "hi"}).status_code == 200
+        client.post(f"{API}/copilot/messages", headers=bob, json={"text": "hi"}).status_code == 202
     )
 
     me = client.get(f"{API}/usage/me", headers=alice).json()
@@ -98,7 +98,7 @@ def test_copilot_stops_mid_answer_when_the_budget_runs_out(client, login, claude
         )
     ]
     r = client.post(f"{API}/copilot/messages", headers=h, json={"text": "overview?"})
-    assert r.status_code == 200
+    assert r.status_code == 202
     assert len(claude.requests) == 1  # never made the second call
     last = r.json()["items"][-1]
     assert last["kind"] == "assistant" and last["text"].startswith("I've had to stop here:")
@@ -136,7 +136,7 @@ def test_no_limit_means_no_limit(client, login, claude):
     for text in ("a", "b", "c"):
         assert (
             client.post(f"{API}/copilot/messages", headers=h, json={"text": text}).status_code
-            == 200
+            == 202
         )
     me = client.get(f"{API}/usage/me", headers=h).json()
     assert me["budget_usd"] is None and me["budget_used_pct"] is None

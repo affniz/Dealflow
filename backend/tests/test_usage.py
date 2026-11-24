@@ -129,7 +129,7 @@ def test_failed_turn_still_records_what_was_billed(client, login, session, claud
 
     claude.script = [tool_call("pipeline_overview", {}), fail]
     r = client.post(f"{API}/copilot/messages", headers=h, json={"text": "hi"})
-    assert r.status_code == 502
+    assert r.status_code == 202
     rows = _rows(session)
     assert len(rows) == 1 and rows[0].feature == "copilot" and rows[0].cost_usd > 0
     # the conversation itself wasn't changed by the failed turn

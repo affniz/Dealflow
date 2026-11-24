@@ -91,13 +91,14 @@ def run_loop(
     max_proposals: int | None = None,
     usage_sink: list[AIUsage] | None = None,
     budget_check: Callable[[], str | None] | None = None,
-    before_call: Callable[[], None] | None = None,
+    before_call: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> LoopResult:
     """`usage_sink` collects the ledger rows of every call made, so a caller whose turn fails
     can still record what was billed (see app.agent.usage.persist_after_failure).
 
-    `before_call` runs right before each model call, after the last database work of the step.
-    The Copilot commits there, so no database connection or lock is held while Claude thinks.
+    `before_call` runs right before each model call, after the last database work of the
+    step, with the messages so far. The Copilot saves its progress and commits there, so the
+    chat shows each step and no database connection or lock is held while Claude thinks.
     """
     messages = list(messages)
     result = LoopResult(messages=messages)
@@ -115,7 +116,7 @@ def run_loop(
             result.final_text = messages[-1]["content"]
             break
         if before_call:
-            before_call()
+            before_call(messages)
         response = client.beta.messages.create(
             model=model,
             max_tokens=16000,

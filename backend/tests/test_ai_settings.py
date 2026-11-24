@@ -22,7 +22,7 @@ def claude(client):
 
 def _ask(client, h, text, **extra):
     r = client.post(f"{API}/copilot/messages", headers=h, json={"text": text, **extra})
-    assert r.status_code == 200, r.text
+    assert r.status_code == 202, r.text
     return r.json()
 
 

@@ -95,6 +95,9 @@ class Settings(BaseSettings):
     COPILOT_MONTHLY_BUDGET_USD: Decimal | None = Decimal("10")  # per person
     PIPELINE_MONTHLY_BUDGET_USD: Decimal | None = Decimal("20")  # the whole team
     COPILOT_MAX_STEPS: int = 8  # model calls per user message, to bound cost and latency
+    # Copilot replies being worked on at once (app.agent.turns); more wait their turn. Each
+    # holds a database connection only between model calls.
+    COPILOT_CONCURRENCY: int = Field(default=8, ge=1)
 
     # Pipeline agent: reviews stalled deals every morning and proposes next steps
     PIPELINE_REVIEW_HOUR: int = 7  # local hour (TIMEZONE) for the daily review

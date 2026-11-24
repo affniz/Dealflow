@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,9 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import Session, col, select
 
-from app.agent import copilot
+from app.agent import copilot, turns
 from app.agent.proposals import decide
-from app.agent.usage import persist_after_failure
 from app.api.access import sees_all
 from app.api.deps import AdminUser, CurrentUser, SessionDep
 from app.core.config import settings
@@ -19,7 +17,6 @@ from app.models import (
     AgentProposalPublic,
     AgentRun,
     AgentRunPublic,
-    AIUsage,
     ChatItem,
     ConversationSummary,
     ConversationView,
@@ -28,10 +25,11 @@ from app.models import (
     NamedRef,
     ProposalStatus,
     Role,
+    TurnFailure,
     User,
     utcnow,
 )
-from app.services.budgets import BudgetExceeded, copilot_block_reason, pipeline_block_reason
+from app.services.budgets import copilot_block_reason, pipeline_block_reason
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["copilot"])
@@ -80,6 +78,9 @@ def _step_label(session: Session, name: str, inp: dict[str, Any], titles: dict[i
 
 
 def _view(session: Session, conv: AgentConversation) -> ConversationView:
+    running = conv.turn_started_at is not None and not turns.is_stale(conv)
+    # while Copilot works, the message and the steps so far follow the finished turns
+    shown = conv.messages + (conv.turn_progress or [] if running else [])
     proposals = session.exec(
         select(AgentProposal)
         .where(AgentProposal.conversation_id == conv.id)
@@ -88,7 +89,7 @@ def _view(session: Session, conv: AgentConversation) -> ConversationView:
     by_tool_use = {p.tool_use_id: p.id for p in proposals}
     tool_uses = [
         b
-        for m in conv.messages
+        for m in shown
         if m["role"] == "assistant" and isinstance(m["content"], list)
         for b in m["content"]
         if b.get("type") == "tool_use"
@@ -106,7 +107,7 @@ def _view(session: Session, conv: AgentConversation) -> ConversationView:
     )
 
     items: list[ChatItem] = []
-    for m in conv.messages:
+    for m in shown:
         content = m["content"]
         if m["role"] == "user" and isinstance(content, str):
             items.append(ChatItem(kind="user", text=content))
@@ -124,6 +125,11 @@ def _view(session: Session, conv: AgentConversation) -> ConversationView:
                             proposal_id=by_tool_use.get(b["id"]),
                         )
                     )
+    failure = None
+    if conv.turn_started_at is not None and not running:  # its process died mid-turn
+        failure = TurnFailure(message=turns.INTERRUPTED, text=turns.turn_text(conv))
+    elif conv.turn_error:
+        failure = TurnFailure.model_validate(conv.turn_error)
     return ConversationView(
         id=conv.id,  # type: ignore[arg-type]
         title=conv.title,
@@ -131,6 +137,8 @@ def _view(session: Session, conv: AgentConversation) -> ConversationView:
         items=items,
         proposals=_proposals_public(session, list(proposals)),
         updated_at=conv.updated_at,
+        running=running,
+        failure=failure,
     )
 
 
@@ -161,10 +169,6 @@ def copilot_status(session: SessionDep, _: CurrentUser, client: ClientDep) -> Ag
     )
 
 
-# a turn that started longer ago than this is taken to have died with its server process
-TURN_TIMEOUT = timedelta(minutes=10)
-
-
 def _start_turn(session: Session, user: User, body: CopilotMessageIn) -> AgentConversation:
     """The conversation, marked as answering a message. The marker, not a lock held for the
     whole turn, keeps a second message (another tab, a double send) out until it's done."""
@@ -173,43 +177,42 @@ def _start_turn(session: Session, user: User, body: CopilotMessageIn) -> AgentCo
     else:
         title = " ".join(body.text.split())
         conv = AgentConversation(user_id=user.id, title=title[:80] or "New chat")  # type: ignore[arg-type]
-    running = conv.turn_started_at
-    if running is not None and utcnow() - running < TURN_TIMEOUT:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "Copilot is still answering your last message in this chat. Try again when it's done.",
+    if conv.turn_started_at is not None:
+        if not turns.is_stale(conv):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Copilot is still answering your last message in this chat. Try again when "
+                "it's done.",
+            )
+        # its server process died mid-turn: withdraw what it proposed before starting afresh
+        turns.end_failed_turn(
+            session,
+            conv.id,
+            conv.turn_started_at,
+            turns.INTERRUPTED,
+            turns.turn_text(conv),  # type: ignore[arg-type]
         )
+        session.refresh(conv)
     conv.turn_started_at = utcnow()
+    conv.turn_error = None
+    conv.turn_progress = [{"role": "user", "content": body.text.strip()}]  # shown straight away
     session.add(conv)
     session.commit()  # releases the row lock
     session.refresh(conv)
     return conv
 
 
-def _end_failed_turn(session: Session, conv_id: int, started: datetime) -> None:
-    """A failed turn isn't added to the chat. Its proposals were committed as it went, so
-    withdraw them, and let the next message in."""
-    conv = session.get(AgentConversation, conv_id)
-    if conv is not None:
-        conv.turn_started_at = None
-        session.add(conv)
-    stmt = select(AgentProposal).where(
-        AgentProposal.conversation_id == conv_id,
-        AgentProposal.status == ProposalStatus.pending,
-        col(AgentProposal.created_at) >= started,
-    )
-    for p in session.exec(stmt):
-        p.status = ProposalStatus.failed
-        p.error = "Copilot's reply didn't finish, so this suggestion was withdrawn"
-        session.add(p)
-    session.commit()
-
-
-@router.post("/copilot/messages", response_model=ConversationView)
+@router.post(
+    "/copilot/messages",
+    response_model=ConversationView,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def send_message(
     session: SessionDep, user: CurrentUser, client: ClientDep, body: CopilotMessageIn
 ) -> ConversationView:
-    """Send a message to the Copilot and get the updated conversation back."""
+    """Send a message to the Copilot. It's answered in the background: the conversation comes
+    back with `running` set, and shows each step as it happens when read again
+    (GET /copilot/conversations/{id}), until the answer is in or `failure` says why not."""
     if client is None:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -218,29 +221,7 @@ def send_message(
     if (reason := copilot_block_reason(session, user)) is not None:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, reason)
     conv = _start_turn(session, user, body)
-    conv_id, started = conv.id, conv.turn_started_at
-    assert conv_id is not None and started is not None
-
-    import anthropic
-
-    billed: list[AIUsage] = []
-    try:
-        # commits before each model call, so no connection or lock is held while Claude works
-        copilot.run_turn(
-            session, client, user, conv, body.text.strip(), body.deal_id, usage_sink=billed
-        )
-    except Exception as exc:
-        session.rollback()
-        persist_after_failure(session, billed)  # calls made before the failure were billed
-        _end_failed_turn(session, conv_id, started)
-        if isinstance(exc, BudgetExceeded):  # spent by another tab in the meantime
-            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from None
-        if not isinstance(exc, anthropic.APIError):
-            raise
-        log.warning("Copilot call failed: %s", exc)
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, "Copilot couldn't reach Claude just now. Try again."
-        ) from None
+    turns.start(conv.id, user.id, body.text.strip(), body.deal_id, client)  # type: ignore[arg-type]
     session.refresh(conv)
     return _view(session, conv)
 

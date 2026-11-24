@@ -132,6 +132,14 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - **Loop** (`app/agent/copilot.py`): a tool-use loop on the Claude Messages API, run in the
   backend. Each user message runs up to `COPILOT_MAX_STEPS` model calls: Claude asks for tools,
   Dealflow runs them and sends back the results, until Claude answers.
+- **In the background** (`app/agent/turns.py`): sending a message returns at once (202), and
+  the reply is worked on in a pool of its own (`COPILOT_CONCURRENCY`, 8 at once; more wait).
+  Before each model call the turn saves what it has done so far and commits, so the chat shows
+  each step as it happens ("Searched deals for …", "Read “Fleet tracking”") and no database
+  connection is held while Claude thinks. The panel checks for progress every second until the
+  answer is in. A reply that fails isn't added to the chat: its suggestions are withdrawn, and
+  the chat says why and puts the message back to send again. One reply at a time per chat; if
+  the server stops mid-reply, the chat says it was interrupted.
 - **Tools** (`app/agent/tools.py`): six read tools (search deals, read a deal and its history,
   contacts, activities, pipeline overview, lost-deal report) and six change tools. Each tool's
   input is a Pydantic model, sent as a `strict` schema and re-validated before it runs.

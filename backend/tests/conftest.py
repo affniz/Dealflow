@@ -1,10 +1,12 @@
 from collections.abc import Callable, Iterator
+from contextlib import nullcontext
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, make_url
 from sqlmodel import Session, SQLModel, create_engine, select
 
+from app.agent import turns
 from app.core.config import settings
 from app.core.db import get_session
 from app.core.security import hash_password
@@ -49,8 +51,11 @@ def session(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(session: Session) -> Iterator[TestClient]:
+def client(session: Session, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     app.dependency_overrides[get_session] = lambda: session
+    # Copilot replies run straight away, on this test's session, instead of in the background
+    monkeypatch.setattr(turns, "run_in_background", lambda fn, *args: fn(*args))
+    monkeypatch.setattr(turns, "session_scope", lambda: nullcontext(session))
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

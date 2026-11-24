@@ -3286,7 +3286,7 @@
           "copilot"
         ],
         "summary": "Send Message",
-        "description": "Send a message to the Copilot and get the updated conversation back.",
+        "description": "Send a message to the Copilot. It's answered in the background: the conversation comes\nback with `running` set, and shows each step as it happens when read again\n(GET /copilot/conversations/{id}), until the answer is in or `failure` says why not.",
         "operationId": "copilot-send_message",
         "requestBody": {
           "content": {
@@ -3299,7 +3299,7 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -5985,6 +5985,21 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "running": {
+            "type": "boolean",
+            "title": "Running",
+            "default": false
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7741,6 +7756,24 @@
         ],
         "title": "TrashItem",
         "description": "A deleted record, restorable until `purge_after`."
+      },
+      "TurnFailure": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "text"
+        ],
+        "title": "TurnFailure"
       },
       "UsageSummary": {
         "properties": {
