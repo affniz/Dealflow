@@ -161,6 +161,50 @@ def test_at_most_two_proposals_per_deal(session, claude, team):
     assert third_result["is_error"] is True and "maximum" in third_result["content"]
 
 
+def test_closing_the_automatic_reminder_doesnt_use_up_the_limit(session, claude, team):
+    """Two real changes (say a follow-up and a stage move) and closing Dealflow's generic
+    reminder all fit; a third real change still doesn't. The evals caught reviews dropping a
+    needed stage move because the reminder used up a slot."""
+    two_changes = reviewer(proposals=2)
+
+    def reply(request: dict[str, Any]) -> dict[str, Any]:
+        messages = request["messages"]
+        step = sum(1 for m in messages if m["role"] == "assistant")
+        deal_id = int(re.search(r"deal (\d+)", messages[0]["content"]).group(1))
+        if step <= 2:
+            return two_changes(request)
+        if step == 3:
+            reminder = int(re.search(r"not a plan\)?: task #(\d+)", json.dumps(messages)).group(1))
+            return tool_call(
+                "propose_complete_activity",
+                {"activity_id": reminder, "reason": "Covered by the follow-ups"},
+                f"done_{deal_id}",
+            )
+        if step == 4:  # a third real change
+            return tool_call(
+                "propose_mark_won", {"deal_id": deal_id, "reason": "?"}, f"third_{deal_id}"
+            )
+        return say("Proposed two follow-ups and closed the reminder.")
+
+    claude.respond = reply
+    review_stalled_deals(session, claude)
+    a = team["a"]["id"]
+    run = session.exec(select(AgentRun).where(AgentRun.deal_id == a)).one()
+    results = {
+        b["tool_use_id"]: b
+        for m in run.messages
+        if m["role"] == "user" and isinstance(m["content"], list)
+        for b in m["content"]
+        if "tool_use_id" in b
+    }
+    closed = json.loads(results[f"done_{a}"]["content"])
+    assert "is_error" not in results[f"done_{a}"] and closed["counts_toward_limit"] is False
+    third = results[f"third_{a}"]
+    assert third["is_error"] is True and "maximum" in third["content"]
+    actions = [p.action for p in _proposals(session) if p.deal_id == a]
+    assert actions == ["log_activity", "log_activity", "complete_activity"]
+
+
 def test_one_failure_doesnt_stop_the_others(session, claude, team):
     good = reviewer()
 
