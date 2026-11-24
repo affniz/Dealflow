@@ -38,7 +38,8 @@ UNREACHABLE = "Copilot couldn't reach Claude just now. Try again."
 BROKE = "Copilot hit an error answering this. Try again; if it keeps happening, tell your admin."
 
 _pool = ThreadPoolExecutor(max_workers=settings.COPILOT_CONCURRENCY, thread_name_prefix="copilot")
-_running: set[int] = set()  # conversations this process is answering
+# the turns this process is answering: (conversation id, the turn's turn_started_at)
+_running: set[tuple[int, datetime]] = set()
 _lock = threading.Lock()
 
 
@@ -54,17 +55,28 @@ run_in_background: Callable[..., Any] = _pool.submit
 
 
 def start(
-    conversation_id: int, user_id: int, text: str, deal_id: int | None, client: MessagesClient
+    conversation_id: int,
+    user_id: int,
+    text: str,
+    deal_id: int | None,
+    client: MessagesClient,
+    started: datetime,
 ) -> None:
     """Answer the message in the background. The conversation is already marked as
-    answering (turn_started_at), and its message is shown from the first progress save."""
+    answering (turn_started_at = `started`, which names this turn), and its message is shown
+    from the first progress save."""
     with _lock:
-        _running.add(conversation_id)
-    run_in_background(_answer, conversation_id, user_id, text, deal_id, client)
+        _running.add((conversation_id, started))
+    run_in_background(_answer, conversation_id, user_id, text, deal_id, client, started)
 
 
 def _answer(
-    conversation_id: int, user_id: int, text: str, deal_id: int | None, client: MessagesClient
+    conversation_id: int,
+    user_id: int,
+    text: str,
+    deal_id: int | None,
+    client: MessagesClient,
+    started: datetime,
 ) -> None:
     import anthropic
 
@@ -72,12 +84,19 @@ def _answer(
         with session_scope() as session:
             conv = session.get(AgentConversation, conversation_id)
             user = session.get(User, user_id)
-            if conv is None or user is None or conv.turn_started_at is None:
-                return  # deleted, or already given up on
-            started = conv.turn_started_at
+            if conv is None or user is None or conv.turn_started_at != started:
+                return  # deleted, or given up on while it waited and another message took over
             billed: list[AIUsage] = []
             try:
-                copilot.run_turn(session, client, user, conv, text, deal_id, usage_sink=billed)
+                copilot.run_turn(
+                    session, client, user, conv, text, deal_id, usage_sink=billed, turn=started
+                )
+            except copilot.TurnSuperseded:
+                # it ran past TURN_TIMEOUT and a newer message took the chat: that turn already
+                # withdrew this one's committed proposals, and the rest are rolled back here
+                session.rollback()
+                persist_after_failure(session, billed)
+                log.warning("Copilot turn in conversation %s was replaced", conversation_id)
             except Exception as exc:
                 session.rollback()
                 persist_after_failure(session, billed)  # calls made before it failed are billed
@@ -94,20 +113,36 @@ def _answer(
         log.exception("Couldn't record the end of Copilot turn %s", conversation_id)
     finally:
         with _lock:
-            _running.discard(conversation_id)
+            _running.discard((conversation_id, started))
 
 
 def end_failed_turn(
-    session: Session, conversation_id: int, started: datetime, message: str, text: str
+    session: Session,
+    conversation_id: int,
+    started: datetime,
+    message: str,
+    text: str,
+    commit: bool = True,
 ) -> None:
     """A failed turn isn't added to the chat. Its proposals were committed as it went, so
-    withdraw them; record why it failed; and let the next message in."""
-    conv = session.get(AgentConversation, conversation_id)
-    if conv is not None:
-        conv.turn_started_at = None
-        conv.turn_progress = None
-        conv.turn_error = {"message": message, "text": text}
-        session.add(conv)
+    withdraw them; record why it failed; and let the next message in.
+
+    Only the turn named by `started` is ended: if a newer message has taken the conversation
+    over meanwhile, this does nothing."""
+    conv = session.exec(
+        select(AgentConversation)
+        .where(AgentConversation.id == conversation_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).first()
+    if conv is None or conv.turn_started_at != started:
+        if commit:
+            session.commit()  # release the lock
+        return
+    conv.turn_started_at = None
+    conv.turn_progress = None
+    conv.turn_error = {"message": message, "text": text}
+    session.add(conv)
     stmt = select(AgentProposal).where(
         AgentProposal.conversation_id == conversation_id,
         AgentProposal.status == ProposalStatus.pending,
@@ -117,7 +152,8 @@ def end_failed_turn(
         p.status = ProposalStatus.failed
         p.error = "Copilot's reply didn't finish, so this suggestion was withdrawn"
         session.add(p)
-    session.commit()
+    if commit:
+        session.commit()
 
 
 def turn_text(conv: AgentConversation) -> str:
@@ -136,15 +172,13 @@ def interrupt_all() -> None:
     """On shutdown: turns this process was answering won't finish, so say so now rather than
     leave the chat waiting until TURN_TIMEOUT."""
     with _lock:
-        ids = list(_running)
+        ours = list(_running)
     _pool.shutdown(wait=False, cancel_futures=True)
-    if not ids:
+    if not ours:
         return
     with session_scope() as session:
-        for conv_id in ids:
+        for conv_id, started in ours:
             conv = session.get(AgentConversation, conv_id)
-            if conv is not None and conv.turn_started_at is not None:
-                end_failed_turn(
-                    session, conv_id, conv.turn_started_at, INTERRUPTED, turn_text(conv)
-                )
-    log.info("Interrupted %d Copilot replies on shutdown", len(ids))
+            if conv is not None:  # ends it only if it's still this turn, not a newer one
+                end_failed_turn(session, conv_id, started, INTERRUPTED, turn_text(conv))
+    log.info("Interrupted %d Copilot replies on shutdown", len(ours))

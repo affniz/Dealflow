@@ -7,9 +7,10 @@ appended to.
 
 import logging
 import os
+from datetime import datetime
 from typing import Any
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.agent.loop import MessagesClient, run_loop
 from app.core.config import settings
@@ -89,10 +90,12 @@ def get_client() -> MessagesClient | None:
 
     if not settings.AI_ENABLED:
         return None
+    # a call that hangs must end well inside a Copilot turn's time limit (turns.TURN_TIMEOUT)
+    limits = {"timeout": settings.CLAUDE_TIMEOUT_SECONDS, "max_retries": 2}
     if settings.ANTHROPIC_API_KEY:
-        return anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        return anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, **limits)
     if _sdk_has_credentials():
-        return anthropic.Anthropic()
+        return anthropic.Anthropic(**limits)
     return None
 
 
@@ -126,6 +129,27 @@ def _turn_context(session: Session, user: User, deal_id: int | None) -> str:
     return " ".join(lines)
 
 
+class TurnSuperseded(Exception):
+    """A newer message took the conversation over while this turn was still working: it was
+    given up on as dead (turns.TURN_TIMEOUT) and the person sent another message."""
+
+
+def _check_still_ours(session: Session, conversation: AgentConversation, turn: datetime) -> None:
+    """Lock the conversation's row until the next commit and check this turn still owns it.
+
+    A turn is named by the `turn_started_at` it was started with. A turn that outlived its time
+    limit (a slow model call, a long queue) may find a newer turn in its place; writing then
+    would overwrite that turn's history, so it stops instead."""
+    with session.no_autoflush:  # check before writing anything
+        current = session.exec(
+            select(AgentConversation.turn_started_at)
+            .where(AgentConversation.id == conversation.id)
+            .with_for_update()
+        ).one()
+    if current != turn:
+        raise TurnSuperseded(f"Conversation {conversation.id} has moved on to another turn")
+
+
 def run_turn(
     session: Session,
     client: MessagesClient,
@@ -134,7 +158,11 @@ def run_turn(
     text: str,
     deal_id: int | None = None,
     usage_sink: list[AIUsage] | None = None,
+    turn: datetime | None = None,
 ) -> None:
+    """Answer `text` in `conversation`. `turn` is the conversation's `turn_started_at` for this
+    message: when given, every save first checks the turn still owns the conversation and
+    raises TurnSuperseded if not (scripts that run a turn directly leave it out)."""
     messages: list[dict[str, Any]] = list(conversation.messages)
     messages.append({"role": "user", "content": text})
     messages.append({"role": "system", "content": _turn_context(session, user, deal_id)})
@@ -150,6 +178,8 @@ def run_turn(
         # what this turn has done so far, for the chat to show while Claude works; then
         # commit, so no database connection or lock is held during the model call (a turn can
         # take a minute, and a few busy chats holding connections would starve the whole API)
+        if turn is not None:
+            _check_still_ours(session, conversation, turn)
         conversation.turn_progress = list(so_far[done_before:])
         session.add(conversation)
         session.commit()
@@ -171,6 +201,8 @@ def run_turn(
         budget_check=lambda: copilot_block_reason(session, user),
         before_call=save_progress,
     )
+    if turn is not None:
+        _check_still_ours(session, conversation, turn)
     conversation.turn_started_at = None
     conversation.turn_progress = None
     conversation.input_tokens += result.input_tokens

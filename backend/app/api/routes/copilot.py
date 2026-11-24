@@ -169,9 +169,32 @@ def copilot_status(session: SessionDep, _: CurrentUser, client: ClientDep) -> Ag
     )
 
 
+def _check_turns_per_person(session: Session, user: User, conv_id: int | None) -> None:
+    """At most COPILOT_TURNS_PER_PERSON replies under way per person, across their chats.
+
+    The person's row is locked until the turn is marked as started, so two messages sent at
+    once (two tabs) are counted one after the other."""
+    session.exec(select(User.id).where(User.id == user.id).with_for_update()).one()
+    since = utcnow() - turns.TURN_TIMEOUT  # older markers belong to turns that died
+    stmt = select(func.count()).where(
+        AgentConversation.user_id == user.id,
+        col(AgentConversation.turn_started_at) > since,
+    )
+    if conv_id is not None:  # this chat's own turn gets its own answer (409) below
+        stmt = stmt.where(AgentConversation.id != conv_id)
+    if session.exec(stmt).one() >= settings.COPILOT_TURNS_PER_PERSON:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Copilot is already answering you in other chats. Try again when one of them is done.",
+        )
+
+
 def _start_turn(session: Session, user: User, body: CopilotMessageIn) -> AgentConversation:
     """The conversation, marked as answering a message. The marker, not a lock held for the
-    whole turn, keeps a second message (another tab, a double send) out until it's done."""
+    whole turn, keeps a second message (another tab, a double send) out until it's done; its
+    time also names the turn, so a turn that outlives its time limit can tell it was replaced.
+    """
+    _check_turns_per_person(session, user, body.conversation_id)
     if body.conversation_id is not None:
         conv = _own_conversation(session, user, body.conversation_id, lock=True)
     else:
@@ -184,20 +207,21 @@ def _start_turn(session: Session, user: User, body: CopilotMessageIn) -> AgentCo
                 "Copilot is still answering your last message in this chat. Try again when "
                 "it's done.",
             )
-        # its server process died mid-turn: withdraw what it proposed before starting afresh
+        # its server process died mid-turn (or the turn is still going, far too slowly):
+        # withdraw what it proposed before starting afresh, in the same transaction
         turns.end_failed_turn(
             session,
-            conv.id,
+            conv.id,  # type: ignore[arg-type]
             conv.turn_started_at,
             turns.INTERRUPTED,
-            turns.turn_text(conv),  # type: ignore[arg-type]
+            turns.turn_text(conv),
+            commit=False,
         )
-        session.refresh(conv)
     conv.turn_started_at = utcnow()
     conv.turn_error = None
     conv.turn_progress = [{"role": "user", "content": body.text.strip()}]  # shown straight away
     session.add(conv)
-    session.commit()  # releases the row lock
+    session.commit()  # releases the row locks
     session.refresh(conv)
     return conv
 
@@ -221,7 +245,14 @@ def send_message(
     if (reason := copilot_block_reason(session, user)) is not None:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, reason)
     conv = _start_turn(session, user, body)
-    turns.start(conv.id, user.id, body.text.strip(), body.deal_id, client)  # type: ignore[arg-type]
+    turns.start(
+        conv.id,  # type: ignore[arg-type]
+        user.id,  # type: ignore[arg-type]
+        body.text.strip(),
+        body.deal_id,
+        client,
+        conv.turn_started_at,  # type: ignore[arg-type]
+    )
     session.refresh(conv)
     return _view(session, conv)
 

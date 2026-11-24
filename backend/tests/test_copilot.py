@@ -14,7 +14,15 @@ from app.agent import copilot, turns
 from app.agent.tools import TOOL_SPECS
 from app.api.routes import copilot as copilot_routes
 from app.main import app
-from app.models import AgentConversation, ConversationView, Deal, Role, utcnow
+from app.models import (
+    AgentConversation,
+    AgentProposal,
+    AIUsage,
+    ConversationView,
+    Deal,
+    Role,
+    utcnow,
+)
 from app.services.rotting import check_rotting
 from tests.conftest import API
 from tests.fakes import FakeClaude, message, say, tool_call
@@ -475,7 +483,8 @@ def test_shutting_down_ends_the_turns_in_progress(client, login, claude, session
     row.turn_progress = [{"role": "user", "content": "Still there?"}]
     session.add(row)
     session.commit()
-    monkeypatch.setattr(turns, "_running", {conv["id"]})
+    session.refresh(row)
+    monkeypatch.setattr(turns, "_running", {(conv["id"], row.turn_started_at)})
     monkeypatch.setattr(turns, "_pool", ThreadPoolExecutor(max_workers=1))
     turns.interrupt_all()
     session.refresh(row)
@@ -502,3 +511,103 @@ def test_sending_doesnt_wait_for_the_answer(client, login, claude, monkeypatch):
     release.set()
     pool.shutdown(wait=True)
     assert answered.is_set()
+
+
+def test_a_turn_that_was_replaced_leaves_the_new_one_alone(client, login, claude, session, stages):
+    """A turn that ran past TURN_TIMEOUT can still be working when the person sends again. The
+    new message takes the chat over; the old turn must then stop without writing anything."""
+    h = login(Role.agent)
+    d = _deal(client, h, stages[0], title="Warehouse")
+    claude.script = [say("Hi")]
+    conv_id = _ask(client, h, "Hello").json()["id"]
+    newer = {"role": "user", "content": "Anyone there?"}
+
+    def someone_sends_again(_: dict) -> dict:
+        # what POST /copilot/messages does for a turn it has given up on
+        row = session.get(AgentConversation, conv_id)
+        turns.end_failed_turn(
+            session, conv_id, row.turn_started_at, turns.INTERRUPTED, "x", commit=False
+        )
+        row.turn_started_at = utcnow()
+        row.turn_progress = [newer]
+        row.turn_error = None
+        session.add(row)
+        session.commit()
+        return tool_call("propose_mark_won", {"deal_id": d["id"], "reason": "Signed"}, "toolu_2")
+
+    claude.script = [
+        tool_call("propose_move_stage", {"deal_id": d["id"], "stage_id": stages[1], "reason": "x"}),
+        someone_sends_again,
+        say("Never asked for"),
+    ]
+    assert _ask(client, h, "Move Warehouse on", conversation_id=conv_id).status_code == 202
+
+    row = session.get(AgentConversation, conv_id)
+    session.refresh(row)
+    assert row.turn_progress == [newer] and row.turn_started_at is not None
+    assert row.turn_error is None
+    assert not turns._running  # it's no longer counted as running here
+    assert [m["content"] for m in row.messages if m["role"] == "user"] == ["Hello"]
+    assert len(claude.requests) == 3  # it stopped before asking Claude again
+    # the proposal it made earlier was withdrawn; the one it made after being replaced is gone
+    made = session.exec(select(AgentProposal).where(AgentProposal.conversation_id == conv_id))
+    assert [(p.action, p.status) for p in made] == [("move_stage", "failed")]
+    # both of its calls were billed (and the first message's)
+    billed = session.exec(select(AIUsage).where(AIUsage.conversation_id == conv_id)).all()
+    assert len(billed) == 3
+
+
+def test_a_queued_turn_that_was_replaced_doesnt_run(client, login, claude, session):
+    h = login(Role.agent)
+    claude.script = [say("Hi")]
+    conv_id = _ask(client, h, "Hello").json()["id"]
+    row = session.get(AgentConversation, conv_id)
+    queued_at = utcnow() - timedelta(minutes=30)
+    row.turn_started_at = utcnow()  # a newer message took the chat while it waited
+    session.add(row)
+    session.commit()
+
+    turns._answer(conv_id, row.user_id, "Old question", None, claude, queued_at)
+    session.refresh(row)
+    assert len(claude.requests) == 1 and row.turn_started_at is not None
+    assert row.turn_error is None
+
+    # nor does shutting down end that newer turn on the old one's behalf
+    turns.end_failed_turn(session, conv_id, queued_at, turns.INTERRUPTED, "Old question")
+    session.refresh(row)
+    assert row.turn_started_at is not None and row.turn_error is None
+
+
+def test_one_person_has_only_a_few_replies_under_way(client, login, claude, session, monkeypatch):
+    monkeypatch.setattr(copilot.settings, "COPILOT_TURNS_PER_PERSON", 2)
+    h = login(Role.agent)
+    claude.script = [say("One"), say("Two")]
+    chats = [_ask(client, h, text).json()["id"] for text in ("First", "Second")]
+    rows = [session.get(AgentConversation, i) for i in chats]
+    for row in rows:  # both still being answered, in other tabs
+        row.turn_started_at = utcnow()
+        session.add(row)
+    session.commit()
+
+    r = _ask(client, h, "Third")
+    assert r.status_code == 429 and "other chats" in r.json()["detail"]
+    # someone else isn't held up by it
+    claude.script = [say("Yours")]
+    assert _ask(client, login(Role.agent), "Mine").status_code == 202
+
+    rows[0].turn_started_at = utcnow() - timedelta(minutes=30)  # that one died long ago
+    session.add(rows[0])
+    session.commit()
+    claude.script = [say("Three")]
+    assert _ask(client, h, "Third").status_code == 202
+
+
+def test_claude_calls_have_a_time_limit(monkeypatch):
+    monkeypatch.setattr(copilot.settings, "AI_ENABLED", True)
+    monkeypatch.setattr(copilot.settings, "ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setattr(copilot.settings, "CLAUDE_TIMEOUT_SECONDS", 90)
+    client = copilot.get_client()
+    assert client is not None
+    assert client.timeout == 90 and client.max_retries == 2
+    # retries included, a hung call gives up well inside a turn's time limit
+    assert 3 * client.timeout < turns.TURN_TIMEOUT.total_seconds()
