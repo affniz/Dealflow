@@ -138,8 +138,15 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   each step as it happens ("Searched deals for …", "Read “Fleet tracking”") and no database
   connection is held while Claude thinks. The panel checks for progress every second until the
   answer is in. A reply that fails isn't added to the chat: its suggestions are withdrawn, and
-  the chat says why and puts the message back to send again. One reply at a time per chat; if
-  the server stops mid-reply, the chat says it was interrupted.
+  the chat says why and puts the message back to send again. One reply at a time per chat, and
+  at most `COPILOT_TURNS_PER_PERSON` (2) per person across their chats, so one person's tabs
+  can't keep everyone else waiting. If the server stops mid-reply, the chat says it was
+  interrupted.
+- **Time limits**: each Claude call gives up after `CLAUDE_TIMEOUT_SECONDS` (120, retried at
+  most twice), and a reply still unfinished after 10 minutes is treated as dead, so the person
+  can send again. A reply is named by the time it started, and it checks it still owns the chat
+  (under a row lock) before every save. So if a slow reply is still working when a newer
+  message replaces it, it stops without writing anything rather than overwriting the newer one.
 - **Tools** (`app/agent/tools.py`): six read tools (search deals, read a deal and its history,
   contacts, activities, pipeline overview, lost-deal report) and six change tools. Each tool's
   input is a Pydantic model, sent as a `strict` schema and re-validated before it runs.

@@ -98,6 +98,11 @@ class Settings(BaseSettings):
     # Copilot replies being worked on at once (app.agent.turns); more wait their turn. Each
     # holds a database connection only between model calls.
     COPILOT_CONCURRENCY: int = Field(default=8, ge=1)
+    # Copilot replies one person can have under way at once (in different chats), so one
+    # person with many tabs can't fill COPILOT_CONCURRENCY and keep everyone else waiting
+    COPILOT_TURNS_PER_PERSON: int = Field(default=2, ge=1)
+    # Seconds one Claude call may take before it's abandoned (and retried, up to twice)
+    CLAUDE_TIMEOUT_SECONDS: float = Field(default=120, gt=0)
 
     # Pipeline agent: reviews stalled deals every morning and proposes next steps
     PIPELINE_REVIEW_HOUR: int = 7  # local hour (TIMEZONE) for the daily review

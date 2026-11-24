@@ -56,6 +56,7 @@ def client(session: Session, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
     # Copilot replies run straight away, on this test's session, instead of in the background
     monkeypatch.setattr(turns, "run_in_background", lambda fn, *args: fn(*args))
     monkeypatch.setattr(turns, "session_scope", lambda: nullcontext(session))
+    monkeypatch.setattr(turns, "_running", set())  # a test's turns don't outlive it
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
