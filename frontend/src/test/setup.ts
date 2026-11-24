@@ -29,3 +29,6 @@ globalThis.Request = class extends NodeRequest {
     super(typeof input === "string" ? new URL(input, window.location.href) : input, init)
   }
 }
+
+// jsdom doesn't lay anything out, so it has nothing to scroll
+if (!Element.prototype.scrollTo) Element.prototype.scrollTo = () => {}

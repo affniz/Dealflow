@@ -10,6 +10,7 @@ from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from app.agent import turns
 from app.api.routes import (
     activities,
     board,
@@ -51,7 +52,10 @@ init_sentry("api")
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     async with mcp_running():
-        yield
+        try:
+            yield
+        finally:
+            turns.interrupt_all()  # Copilot replies this process won't get to finish
 
 
 app = FastAPI(

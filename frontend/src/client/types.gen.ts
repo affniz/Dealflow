@@ -911,6 +911,11 @@ export type ConversationView = {
      * Updated At
      */
     updated_at: string;
+    /**
+     * Running
+     */
+    running?: boolean;
+    failure?: TurnFailure | null;
 };
 
 /**
@@ -1994,6 +1999,20 @@ export type TrashItem = {
      * Purge After
      */
     purge_after: string;
+};
+
+/**
+ * TurnFailure
+ */
+export type TurnFailure = {
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Text
+     */
+    text: string;
 };
 
 /**
@@ -4167,7 +4186,7 @@ export type CopilotSendMessageResponses = {
     /**
      * Successful Response
      */
-    200: ConversationView;
+    202: ConversationView;
 };
 
 export type CopilotSendMessageResponse = CopilotSendMessageResponses[keyof CopilotSendMessageResponses];

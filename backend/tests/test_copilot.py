@@ -1,16 +1,20 @@
 """Copilot tests with a scripted stand-in for Claude: no network, no API key, no cost."""
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 import anthropic
 import httpx2
 import pytest
+from sqlmodel import select
 
-from app.agent import copilot
+from app.agent import copilot, turns
 from app.agent.tools import TOOL_SPECS
+from app.api.routes import copilot as copilot_routes
 from app.main import app
-from app.models import AgentConversation, Deal, Role, utcnow
+from app.models import AgentConversation, ConversationView, Deal, Role, utcnow
 from app.services.rotting import check_rotting
 from tests.conftest import API
 from tests.fakes import FakeClaude, message, say, tool_call
@@ -73,7 +77,7 @@ def test_read_tool_loop_and_request_shape(client, login, claude, session, stages
         say("One deal is stalled: Supplier portal (20 days in Lead)."),
     ]
     r = _ask(client, h, "What's stalled?", deal_id=stale["id"])
-    assert r.status_code == 200, r.text
+    assert r.status_code == 202, r.text
     view = r.json()
     assert [(i["kind"], i["text"]) for i in view["items"]] == [
         ("user", "What's stalled?"),
@@ -391,7 +395,7 @@ def test_one_turn_at_a_time_per_conversation(client, login, claude, session):
     session.add(row)
     session.commit()
     claude.script = [say("Here")]
-    assert _ask(client, h, "And now?", conversation_id=conv["id"]).status_code == 200
+    assert _ask(client, h, "And now?", conversation_id=conv["id"]).status_code == 202
     session.refresh(row)
     assert row.turn_started_at is None
 
@@ -409,12 +413,92 @@ def test_failed_turn_withdraws_its_proposals_and_frees_the_chat(client, login, c
         tool_call("propose_move_stage", {"deal_id": d["id"], "stage_id": stages[1], "reason": "x"}),
         fail,
     ]
-    assert _ask(client, h, "Move Expansion on").status_code == 502
+    r = _ask(client, h, "Move Expansion on")
+    assert r.status_code == 202
+    conv = client.get(f"{API}/copilot/conversations/{r.json()['id']}", headers=h).json()
+    # it says why, and gives back the message to send again; the failed turn isn't kept
+    assert conv["running"] is False and conv["items"] == []
+    assert conv["failure"] == {"message": turns.UNREACHABLE, "text": "Move Expansion on"}
     mine = client.get(f"{API}/proposals", headers=h).json()
     assert [(p["status"], p["error"]) for p in mine] == [
         ("failed", "Copilot's reply didn't finish, so this suggestion was withdrawn")
     ]
-    conv = client.get(f"{API}/copilot/conversations", headers=h).json()[0]
     claude.script = [say("Back")]
     view = _ask(client, h, "Try again", conversation_id=conv["id"]).json()
     assert [i["text"] for i in view["items"]] == ["Try again", "Back"]
+    assert view["failure"] is None
+
+
+def test_the_chat_shows_each_step_while_copilot_works(client, login, claude, session, stages):
+    h = login(Role.agent)
+    d = _deal(client, h, stages[0], title="Fleet tracking")
+    seen: list[ConversationView] = []
+
+    def look(_: dict) -> dict:  # what someone reading the chat sees just before this call
+        conv = session.exec(select(AgentConversation)).one()
+        seen.append(copilot_routes._view(session, conv))
+        return tool_call("get_deal", {"deal_id": d["id"]}) if len(seen) == 1 else say("Done")
+
+    claude.script = [look, look]
+    view = _ask(client, h, "How is Fleet tracking?").json()
+    first, second = seen
+    assert first.running and [i.text for i in first.items] == ["How is Fleet tracking?"]
+    assert second.running and [(i.kind, i.text) for i in second.items] == [
+        ("user", "How is Fleet tracking?"),
+        ("step", "Read “Fleet tracking”"),
+    ]
+    assert view["running"] is False and view["items"][-1]["text"] == "Done"
+    assert session.exec(select(AgentConversation)).one().turn_progress is None
+
+
+def test_a_turn_whose_server_died_says_so(client, login, claude, session):
+    h = login(Role.agent)
+    claude.script = [say("Hi")]
+    conv = _ask(client, h, "Hello").json()
+    row = session.get(AgentConversation, conv["id"])
+    row.turn_started_at = utcnow() - timedelta(minutes=30)
+    row.turn_progress = [{"role": "user", "content": "Are you there?"}]
+    session.add(row)
+    session.commit()
+    view = client.get(f"{API}/copilot/conversations/{conv['id']}", headers=h).json()
+    assert view["running"] is False
+    assert view["failure"] == {"message": turns.INTERRUPTED, "text": "Are you there?"}
+    assert [i["text"] for i in view["items"]] == ["Hello", "Hi"]
+
+
+def test_shutting_down_ends_the_turns_in_progress(client, login, claude, session, monkeypatch):
+    h = login(Role.agent)
+    claude.script = [say("Hi")]
+    conv = _ask(client, h, "Hello").json()
+    row = session.get(AgentConversation, conv["id"])
+    row.turn_started_at = utcnow()
+    row.turn_progress = [{"role": "user", "content": "Still there?"}]
+    session.add(row)
+    session.commit()
+    monkeypatch.setattr(turns, "_running", {conv["id"]})
+    monkeypatch.setattr(turns, "_pool", ThreadPoolExecutor(max_workers=1))
+    turns.interrupt_all()
+    session.refresh(row)
+    assert row.turn_started_at is None
+    assert row.turn_error == {"message": turns.INTERRUPTED, "text": "Still there?"}
+
+
+def test_sending_doesnt_wait_for_the_answer(client, login, claude, monkeypatch):
+    """The request returns while Copilot is still working, in a pool of its own."""
+    h = login(Role.agent)
+    release, answered = threading.Event(), threading.Event()
+
+    def slow_answer(*_: object) -> None:
+        release.wait(5)
+        answered.set()
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    monkeypatch.setattr(turns, "run_in_background", pool.submit)
+    monkeypatch.setattr(turns, "_answer", slow_answer)
+    r = _ask(client, h, "Hello")
+    assert r.status_code == 202 and r.json()["running"] is True
+    assert [i["text"] for i in r.json()["items"]] == ["Hello"]
+    assert not answered.is_set()
+    release.set()
+    pool.shutdown(wait=True)
+    assert answered.is_set()

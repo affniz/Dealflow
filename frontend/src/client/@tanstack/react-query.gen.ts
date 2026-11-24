@@ -1106,7 +1106,9 @@ export const copilotCopilotStatusOptions = (options?: Options<CopilotCopilotStat
 /**
  * Send Message
  *
- * Send a message to the Copilot and get the updated conversation back.
+ * Send a message to the Copilot. It's answered in the background: the conversation comes
+ * back with `running` set, and shows each step as it happens when read again
+ * (GET /copilot/conversations/{id}), until the answer is in or `failure` says why not.
  */
 export const copilotSendMessageMutation = (options?: Partial<Options<CopilotSendMessageData>>): UseMutationOptions<CopilotSendMessageResponse, CopilotSendMessageError, Options<CopilotSendMessageData>> => {
     const mutationOptions: UseMutationOptions<CopilotSendMessageResponse, CopilotSendMessageError, Options<CopilotSendMessageData>> = {

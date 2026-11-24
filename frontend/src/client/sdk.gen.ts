@@ -688,7 +688,9 @@ export const copilotCopilotStatus = <ThrowOnError extends boolean = false>(optio
 /**
  * Send Message
  *
- * Send a message to the Copilot and get the updated conversation back.
+ * Send a message to the Copilot. It's answered in the background: the conversation comes
+ * back with `running` set, and shows each step as it happens when read again
+ * (GET /copilot/conversations/{id}), until the answer is in or `failure` says why not.
  */
 export const copilotSendMessage = <ThrowOnError extends boolean = false>(options: Options<CopilotSendMessageData, ThrowOnError>): RequestResult<CopilotSendMessageResponses, CopilotSendMessageErrors, ThrowOnError> => (options.client ?? client).post<CopilotSendMessageResponses, CopilotSendMessageErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

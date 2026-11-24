@@ -144,6 +144,16 @@ def run_turn(
     if conversation.prompt_version is None:
         # chats from before prompts were versioned started on version 1
         conversation.prompt_version = 1 if conversation.messages else CURRENT_PROMPT
+    done_before = len(conversation.messages)
+
+    def save_progress(so_far: list[dict[str, Any]]) -> None:
+        # what this turn has done so far, for the chat to show while Claude works; then
+        # commit, so no database connection or lock is held during the model call (a turn can
+        # take a minute, and a few busy chats holding connections would starve the whole API)
+        conversation.turn_progress = list(so_far[done_before:])
+        session.add(conversation)
+        session.commit()
+
     result = run_loop(
         session,
         client,
@@ -159,11 +169,10 @@ def run_turn(
         conversation_id=conversation.id,
         usage_sink=usage_sink,
         budget_check=lambda: copilot_block_reason(session, user),
-        # release the database connection while Claude works: a turn can take a minute, and
-        # holding a connection for it would let a few busy chats starve the whole API
-        before_call=session.commit,
+        before_call=save_progress,
     )
     conversation.turn_started_at = None
+    conversation.turn_progress = None
     conversation.input_tokens += result.input_tokens
     conversation.output_tokens += result.output_tokens
     conversation.messages = result.messages  # a new list, so SQLAlchemy saves the JSON column

@@ -69,7 +69,10 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
   const conversation = useQuery({
     ...conversationOptions,
     enabled: open && conversationId !== null,
+    // Copilot answers in the background: check every second for its next step until it's done
+    refetchInterval: (query) => (query.state.data?.running ? 1000 : false),
   })
+  const running = conversation.data?.running ?? false
 
   function selectConversation(id: number | null) {
     setConversationId(id)
@@ -78,6 +81,8 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
     setError(null)
   }
 
+  // the message being answered, so a failed answer can put it back in the box
+  const sentText = useRef<string | null>(null)
   const send = useMutation({
     ...copilotSendMessageMutation(),
     onSuccess: (view: ConversationView) => {
@@ -86,7 +91,7 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
         view,
       )
       selectConversation(view.id)
-      invalidate(queryClient, "copilotListConversations", "copilotListProposals", "usageMyUsage")
+      invalidate(queryClient, "copilotListConversations")
     },
     onError: (e, vars) => {
       setError(apiErrorMessage(e, "Copilot couldn't answer. Try again."))
@@ -94,6 +99,22 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
     },
     onSettled: () => setPendingText(null),
   })
+
+  // When an answer finishes: its suggestions and cost show elsewhere too. If it failed, say why
+  // and put the message back in the box to send again.
+  const wasRunning = useRef(false)
+  const failure = conversation.data?.failure
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      invalidate(queryClient, "copilotListProposals", "usageMyUsage", "copilotListConversations")
+      if (failure && failure.text === sentText.current) {
+        setError(failure.message)
+        setDraft((d) => d || failure.text)
+      }
+      sentText.current = null
+    }
+    wasRunning.current = running
+  }, [running, failure, queryClient])
 
   // Conversation lookups that fail (deleted, someone else's) start a fresh chat.
   useEffect(() => {
@@ -112,14 +133,15 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
   const items = conversation.data?.items ?? []
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
-  }, [items.length, pendingText])
+  }, [items.length, pendingText, running])
 
   function submit(text: string) {
     const clean = text.trim()
-    if (!clean || send.isPending) return
+    if (!clean || send.isPending || running) return
     setError(null)
     setDraft("")
     setPendingText(clean)
+    sentText.current = clean
     send.mutate({ body: { text: clean, conversation_id: conversationId, deal_id: dealId } })
   }
 
@@ -263,22 +285,22 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
               )
             })}
             {pendingText && (
-              <>
-                <div className="flex justify-end">
-                  <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-brand-600 px-3 py-2 text-sm whitespace-pre-line text-white">
-                    {pendingText}
-                  </p>
-                </div>
-                <p className="flex items-center gap-2 text-sm text-ink-soft" role="status">
-                  <Spinner className="size-4" /> Working on it…
+              <div className="flex justify-end">
+                <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-brand-600 px-3 py-2 text-sm whitespace-pre-line text-white">
+                  {pendingText}
                 </p>
-              </>
+              </div>
+            )}
+            {(pendingText || running) && (
+              <p className="flex items-center gap-2 text-sm text-ink-soft" role="status">
+                <Spinner className="size-4" /> Working on it…
+              </p>
             )}
           </>
         )}
-        {error && (
+        {(error ?? failure) && !running && (
           <p role="alert" className="text-sm text-red-600">
-            {error}
+            {error ?? `Your last message didn't get an answer. ${failure!.message}`}
           </p>
         )}
       </div>
@@ -329,7 +351,7 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
             type="submit"
             size="icon"
             aria-label="Send"
-            disabled={!enabled || !draft.trim() || send.isPending}
+            disabled={!enabled || !draft.trim() || send.isPending || running}
           >
             <ArrowUp />
           </Button>

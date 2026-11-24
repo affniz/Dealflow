@@ -738,6 +738,13 @@ class AgentConversation(SQLModel, table=True):
     prompt_version: int | None = None  # app.agent.copilot.PROMPTS key; fixed like the model
     # set while a turn is being answered, so a second message waits for it (see send_message)
     turn_started_at: datetime | None = None
+    # the turn being answered so far (the message, then each step), saved before every model
+    # call so the chat can show progress; it joins `messages` only when the turn completes
+    turn_progress: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    # why the last turn got no answer, and its text, until the next message: {"message", "text"}
+    turn_error: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
     input_tokens: int = 0
     output_tokens: int = 0
     created_at: datetime = Field(default_factory=utcnow)
@@ -841,13 +848,21 @@ class ChatItem(BaseModel):
     proposal_id: int | None = None
 
 
+class TurnFailure(BaseModel):
+    message: str  # what went wrong, for the person
+    text: str  # the message that got no answer, so they can send it again
+
+
 class ConversationView(BaseModel):
     id: int
     title: str
     model: str | None = None
+    # the chat so far, then (while `running`) the message being answered and its steps so far
     items: list[ChatItem]
     proposals: list[AgentProposalPublic]
     updated_at: datetime
+    running: bool = False  # Copilot is answering; ask again shortly for progress
+    failure: TurnFailure | None = None  # the last message got no answer
 
 
 class ConversationSummary(BaseModel):
