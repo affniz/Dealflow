@@ -1793,7 +1793,7 @@ export type PipelineUpdate = {
 /**
  * ProposalStatus
  */
-export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'failed';
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'failed' | 'expired';
 
 /**
  * Role

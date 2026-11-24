@@ -1,11 +1,25 @@
 """Approving or rejecting what an agent proposed. Approval runs the change through the shared
 action layer as the approving person, so their access rules apply at that moment."""
 
-from fastapi import HTTPException, status
-from sqlmodel import Session, select
+from datetime import timedelta
 
-from app.models import ActivityCreate, AgentProposal, ProposalStatus, Role, User, utcnow
+from fastapi import HTTPException, status
+from sqlmodel import Session, col, select
+
+from app.core.config import settings
+from app.models import (
+    ActivityCreate,
+    AgentProposal,
+    Deal,
+    DealStatus,
+    ProposalStatus,
+    Role,
+    User,
+    utcnow,
+)
 from app.services import actions
+
+PIPELINE = "pipeline_agent"  # AgentProposal.source for the pipeline agent's suggestions
 
 
 def can_decide(user: User, proposal: AgentProposal) -> bool:
@@ -87,3 +101,44 @@ def decide(session: Session, user: User, proposal_id: int, approve: bool) -> Age
 def _check_pending(proposal: AgentProposal) -> None:
     if proposal.status != ProposalStatus.pending:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Proposal is already {proposal.status}")
+
+
+def expire_stale_suggestions(session: Session) -> int:
+    """Expire the pipeline agent's suggestions that are waiting but no longer useful, and
+    commit; returns how many.
+
+    The agent doesn't review a deal again while a suggestion for it is waiting, so one that
+    nobody answers would keep that deal out of every review. A suggestion expires when:
+    - nobody decided on it within PIPELINE_SUGGESTION_DAYS, so the deal gets a fresh look;
+    - its deal was closed, so it no longer applies;
+    - its deal now belongs to someone else, who wouldn't see it (and gets their own review).
+    Suggestions someone is deciding on right now are left alone (their rows are locked).
+    """
+    now = utcnow()
+    days = settings.PIPELINE_SUGGESTION_DAYS
+    too_old = now - timedelta(days=days)
+    rows = session.exec(
+        select(AgentProposal, Deal)
+        .join(Deal, col(Deal.id) == AgentProposal.deal_id, isouter=True)
+        .where(AgentProposal.source == PIPELINE, AgentProposal.status == ProposalStatus.pending)
+        .with_for_update(of=AgentProposal, skip_locked=True)  # type: ignore[arg-type]
+    ).all()
+    expired = 0
+    for proposal, deal in rows:
+        if deal is None:  # deleted for good (the trash withdraws them on delete already)
+            reason = "The deal no longer exists"
+        elif deal.status != DealStatus.open:
+            reason = f"The deal was marked {deal.status.value}, so this no longer applies"
+        elif deal.owner_id != proposal.user_id:
+            reason = "The deal now belongs to someone else, so this was withdrawn"
+        elif proposal.created_at < too_old:
+            reason = f"Nobody decided on this within {days} days, so it expired"
+        else:
+            continue
+        proposal.status = ProposalStatus.expired
+        proposal.error = reason
+        proposal.decided_at = now
+        session.add(proposal)
+        expired += 1
+    session.commit()
+    return expired

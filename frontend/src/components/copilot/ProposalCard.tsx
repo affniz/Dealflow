@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Check, CircleAlert, Sparkles, X } from "lucide-react"
+import { Check, CircleAlert, Clock, Sparkles, X } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import {
@@ -68,6 +68,11 @@ export function ProposalCard({
           {proposal.status === "failed" && proposal.error && (
             <p className="mt-1 flex items-center gap-1 text-red-600">
               <CircleAlert className="size-3.5" /> {proposal.error}
+            </p>
+          )}
+          {proposal.status === "expired" && proposal.error && (
+            <p className="mt-1 flex items-center gap-1 text-ink-soft">
+              <Clock className="size-3.5" /> {proposal.error}
             </p>
           )}
         </div>

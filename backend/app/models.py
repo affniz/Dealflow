@@ -792,6 +792,9 @@ class ProposalStatus(StrEnum):
     approved = "approved"  # approved and applied
     rejected = "rejected"
     failed = "failed"  # approved, but applying it failed (e.g. the deal changed meanwhile)
+    # nobody decided in time, or it stopped applying (the deal closed or changed hands); only
+    # the pipeline agent's suggestions expire (app.agent.proposals.expire_stale_suggestions)
+    expired = "expired"
 
 
 class AgentProposal(SQLModel, table=True):

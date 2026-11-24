@@ -11,6 +11,7 @@ from sqlmodel import select
 
 from app.agent import copilot, pipeline
 from app.agent.pipeline import review_stalled_deals
+from app.agent.proposals import expire_stale_suggestions
 from app.main import app
 from app.models import AgentProposal, AgentRun, Deal, Role, RunStatus, User, utcnow
 from app.services.rotting import check_rotting
@@ -313,3 +314,83 @@ def test_agent_is_told_the_reminder_is_not_a_plan(session, claude, team):
     assert len(reminder) == 1 and "not a plan" in reminder[0]
     assert not any("Follow up, or move it" in h for h in history)  # its generic text is hidden
     assert "never treat it as covering the next step" in pipeline.SYSTEM_PROMPT.replace("\n", " ")
+
+
+def _age(session, rows, days):
+    for row in rows:
+        row.created_at = utcnow() - timedelta(days=days)
+        session.add(row)
+    session.commit()
+
+
+def test_unanswered_suggestions_expire_and_the_deal_is_reviewed_again(session, claude, team):
+    review_stalled_deals(session, claude)
+    assert expire_stale_suggestions(session) == 0  # still fresh
+    alices, bobs = _proposals(session)
+    bobs.status = "rejected"  # Bob said no; Alice never answered
+    session.add(bobs)
+    session.commit()
+
+    _age(session, _proposals(session), 8)
+    _age(session, session.exec(select(AgentRun)).all(), 8)
+    assert expire_stale_suggestions(session) == 1
+    session.refresh(alices)
+    assert alices.status == "expired" and alices.decided_at is not None
+    assert alices.error == "Nobody decided on this within 7 days, so it expired"
+
+    # both deals come up again, and each review hears what wasn't taken last time
+    before = len(claude.requests)
+    assert review_stalled_deals(session, claude).reviewed == 2
+    asks = [
+        r["messages"][0]["content"] for r in claude.requests[before:] if len(r["messages"]) == 2
+    ]
+    alice_ask, bob_ask = asks
+    assert "earlier suggestions for this deal that weren't taken" in alice_ask
+    assert (
+        "Add task on “Alice stalled”: Follow up #1, due" in alice_ask
+        and ": expired (Nobody decided on this within 7 days, so it expired)" in alice_ask
+    )
+    assert bob_ask.rstrip().endswith(
+        "If you still think it's the right step, say why in your note."
+    )
+    assert ": rejected\n" in bob_ask
+
+
+def test_suggestions_expire_when_the_deal_closes_or_changes_hands(
+    client, login, session, claude, team
+):
+    review_stalled_deals(session, claude)
+    admin = login(Role.admin)
+    alice = session.exec(select(User).where(User.email == "alice@example.com")).one()
+    bob = session.exec(select(User).where(User.email == "bob@example.com")).one()
+    copilots = AgentProposal(
+        source="copilot",
+        user_id=alice.id,
+        deal_id=team["a"]["id"],
+        action="mark_won",
+        params={},
+        summary="Mark it won",
+        created_at=utcnow() - timedelta(days=30),
+    )
+    session.add(copilots)
+    session.commit()
+
+    r = client.patch(f"{API}/deals/{team['a']['id']}", headers=admin, json={"owner_id": bob.id})
+    assert r.status_code == 200, r.text
+    assert client.post(f"{API}/deals/{team['b']['id']}/won", headers=team["bob"]).is_success
+    assert expire_stale_suggestions(session) == 2
+
+    reasons = {p.deal_id: (p.status, p.error) for p in _proposals(session) if p.source != "copilot"}
+    assert reasons == {
+        team["a"]["id"]: ("expired", "The deal now belongs to someone else, so this was withdrawn"),
+        team["b"]["id"]: ("expired", "The deal was marked won, so this no longer applies"),
+    }
+    # only the pipeline agent's suggestions expire: one someone asked the Copilot for stays
+    session.refresh(copilots)
+    assert copilots.status == "pending"
+
+    # the inbox lists them as decided, with the reason
+    mine = client.get(f"{API}/proposals", headers=team["alice"], params={"status": "expired"})
+    assert [p["error"] for p in mine.json()] == [
+        "The deal now belongs to someone else, so this was withdrawn"
+    ]
