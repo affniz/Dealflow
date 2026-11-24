@@ -1208,6 +1208,57 @@
         }
       }
     },
+    "/api/v1/contacts/duplicates": {
+      "post": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Find Contact Duplicates",
+        "description": "Contacts that look like this one: the same email, the same phone number, or the same\nname at the same company. Nothing is blocked; the app asks before adding a likely\nduplicate. A POST, so emails and phone numbers stay out of addresses and logs.",
+        "operationId": "contacts-find_contact_duplicates",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactDuplicateCheck"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ContactMatch"
+                  },
+                  "type": "array",
+                  "title": "Response Contacts-Find Contact Duplicates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/contacts/{contact_id}": {
       "get": {
         "tags": [
@@ -5717,6 +5768,168 @@
           "first_name"
         ],
         "title": "ContactCreate"
+      },
+      "ContactDuplicateCheck": {
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "First Name",
+            "default": ""
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "company_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Id"
+          },
+          "exclude_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclude Id",
+            "description": "The contact being edited"
+          }
+        },
+        "type": "object",
+        "title": "ContactDuplicateCheck",
+        "description": "A contact about to be saved, to look for people already in the CRM."
+      },
+      "ContactMatch": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NamedRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reasons": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "email",
+                "phone",
+                "name"
+              ]
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "job_title",
+          "email",
+          "phone",
+          "company",
+          "owner",
+          "reasons"
+        ],
+        "title": "ContactMatch",
+        "description": "An existing contact that looks like the same person, and why."
       },
       "ContactPublic": {
         "properties": {

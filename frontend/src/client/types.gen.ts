@@ -772,6 +772,74 @@ export type ContactCreate = {
 };
 
 /**
+ * ContactDuplicateCheck
+ *
+ * A contact about to be saved, to look for people already in the CRM.
+ */
+export type ContactDuplicateCheck = {
+    /**
+     * First Name
+     */
+    first_name?: string;
+    /**
+     * Last Name
+     */
+    last_name?: string | null;
+    /**
+     * Email
+     */
+    email?: string | null;
+    /**
+     * Phone
+     */
+    phone?: string | null;
+    /**
+     * Company Id
+     */
+    company_id?: number | null;
+    /**
+     * Exclude Id
+     *
+     * The contact being edited
+     */
+    exclude_id?: number | null;
+};
+
+/**
+ * ContactMatch
+ *
+ * An existing contact that looks like the same person, and why.
+ */
+export type ContactMatch = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Job Title
+     */
+    job_title: string | null;
+    /**
+     * Email
+     */
+    email: string | null;
+    /**
+     * Phone
+     */
+    phone: string | null;
+    company: NamedRef | null;
+    owner: NamedRef | null;
+    /**
+     * Reasons
+     */
+    reasons: Array<'email' | 'phone' | 'name'>;
+};
+
+/**
  * ContactPublic
  */
 export type ContactPublic = {
@@ -3071,6 +3139,33 @@ export type ContactsCreateContactResponses = {
 };
 
 export type ContactsCreateContactResponse = ContactsCreateContactResponses[keyof ContactsCreateContactResponses];
+
+export type ContactsFindContactDuplicatesData = {
+    body: ContactDuplicateCheck;
+    path?: never;
+    query?: never;
+    url: '/api/v1/contacts/duplicates';
+};
+
+export type ContactsFindContactDuplicatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ContactsFindContactDuplicatesError = ContactsFindContactDuplicatesErrors[keyof ContactsFindContactDuplicatesErrors];
+
+export type ContactsFindContactDuplicatesResponses = {
+    /**
+     * Response Contacts-Find Contact Duplicates
+     *
+     * Successful Response
+     */
+    200: Array<ContactMatch>;
+};
+
+export type ContactsFindContactDuplicatesResponse = ContactsFindContactDuplicatesResponses[keyof ContactsFindContactDuplicatesResponses];
 
 export type ContactsDeleteContactData = {
     body?: never;

@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { type FormEvent, useState } from "react"
+import { Link } from "react-router-dom"
 
 import {
   contactsCreateContactMutation,
+  contactsFindContactDuplicatesMutation,
   contactsUpdateContactMutation,
 } from "@/client/@tanstack/react-query.gen"
-import type { ContactPublic, NamedRef } from "@/client/types.gen"
+import type { ContactMatch, ContactPublic, NamedRef } from "@/client/types.gen"
 import { CompanySelect, OwnerSelect } from "@/components/records/fields"
 import { changedFields, type FieldRow, fromFieldRows, orNull, toFieldRows } from "@/lib/forms"
 import { CustomFieldsEditor } from "@/components/records/CustomFieldsEditor"
@@ -27,6 +29,15 @@ type Values = {
   company_id: number | null
   owner_id: number | null
   fields: FieldRow[]
+}
+
+// the fields that say who someone is: changing one is worth checking for duplicates
+const IDENTITY = ["first_name", "last_name", "email", "phone", "company_id"] as const
+
+const REASONS: Record<ContactMatch["reasons"][number], string> = {
+  email: "same email",
+  phone: "same phone",
+  name: "same name at this company",
 }
 
 /** Add a contact, or edit one when `contact` is given. */
@@ -89,8 +100,13 @@ function ContactForm({
     fields: toFieldRows(contact?.custom_fields),
   }))
   const [v, setV] = useState(initial)
+  // likely duplicates found when they last pressed save; saving again saves anyway
+  const [matches, setMatches] = useState<ContactMatch[] | null>(null)
   useUnsavedChanges(JSON.stringify(v) !== JSON.stringify(initial))
-  const set = (patch: Partial<Values>) => setV({ ...v, ...patch })
+  const set = (patch: Partial<Values>) => {
+    setV({ ...v, ...patch })
+    setMatches(null) // what they type next gets checked afresh
+  }
 
   const done = (saved: ContactPublic) => {
     invalidate(queryClient, ...RECORD_QUERIES)
@@ -101,7 +117,8 @@ function ContactForm({
   const onError = (e: unknown) => setError(apiErrorMessage(e))
   const create = useMutation({ ...contactsCreateContactMutation(), onSuccess: done, onError })
   const update = useMutation({ ...contactsUpdateContactMutation(), onSuccess: done, onError })
-  const busy = create.isPending || update.isPending
+  const check = useMutation(contactsFindContactDuplicatesMutation())
+  const busy = create.isPending || update.isPending || check.isPending
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -118,11 +135,26 @@ function ContactForm({
       custom_fields: custom.fields,
       ...(isAdmin && v.owner_id ? { owner_id: v.owner_id } : {}),
     }
-    if (!contact) return create.mutate({ body })
-    // only what changed, so an untouched company link isn't re-checked
-    const changes = changedFields(body, contact)
-    if (Object.keys(changes).length === 0) return onClose()
-    update.mutate({ path: { contact_id: contact.id }, body: changes })
+    // when editing, send only what changed, so an untouched company link isn't re-checked
+    const changes = contact ? changedFields(body, contact) : body
+    if (contact && Object.keys(changes).length === 0) return onClose()
+    const save = () =>
+      contact
+        ? update.mutate({ path: { contact_id: contact.id }, body: changes })
+        : create.mutate({ body })
+
+    // they've seen the likely duplicates and want it anyway, or nothing about who it is changed
+    if (matches !== null || (contact && !IDENTITY.some((k) => k in changes))) return save()
+    const { first_name, last_name, email, phone, company_id } = body
+    check.mutate(
+      {
+        body: { first_name, last_name, email, phone, company_id, exclude_id: contact?.id ?? null },
+      },
+      {
+        onSuccess: (found) => (found.length > 0 ? setMatches(found) : save()),
+        onError: save, // the check is a courtesy: it never stops anyone saving
+      },
+    )
   }
 
   return (
@@ -197,6 +229,7 @@ function ContactForm({
         </Field>
       )}
       <CustomFieldsEditor rows={v.fields} onChange={(fields) => set({ fields })} />
+      {matches && <PossibleDuplicates matches={matches} editing={Boolean(contact)} />}
       {error && (
         <p role="alert" className="text-sm text-red-600">
           {error}
@@ -207,9 +240,56 @@ function ContactForm({
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
-          {busy ? "Saving…" : contact ? "Save" : "Add contact"}
+          {busy
+            ? "Saving…"
+            : matches
+              ? contact
+                ? "Save anyway"
+                : "Add anyway"
+              : contact
+                ? "Save"
+                : "Add contact"}
         </Button>
       </SheetFooter>
     </form>
+  )
+}
+
+/** Contacts already in Dealflow that look like this one. Each opens in a new tab, so what's
+ * been typed here isn't lost. */
+function PossibleDuplicates({ matches, editing }: { matches: ContactMatch[]; editing: boolean }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+    >
+      <p className="font-medium">
+        {matches.length === 1
+          ? "This person may already be in Dealflow"
+          : "These may be the same person"}
+      </p>
+      <ul className="mt-2 space-y-2">
+        {matches.map((m) => (
+          <li key={m.id}>
+            <Link
+              to={`/contacts/${m.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium underline underline-offset-2"
+            >
+              {m.name}
+            </Link>
+            {m.company && <span> · {m.company.name}</span>}
+            <span className="block text-xs">
+              {m.reasons.map((r) => REASONS[r]).join(", ")}
+              {m.owner && ` · ${m.owner.name}'s contact`}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs">
+        Use the existing contact instead, or {editing ? "save" : "add"} this one anyway.
+      </p>
+    </div>
   )
 }
