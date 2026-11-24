@@ -7,6 +7,7 @@ from sqlmodel import col, or_, select
 from app.api.access import (
     apply_update,
     check_ref,
+    get_editable,
     get_visible,
     paginate,
     resolve_owner,
@@ -87,7 +88,7 @@ def read_contact(session: SessionDep, user: CurrentUser, contact_id: int) -> Con
 def update_contact(
     session: SessionDep, user: WriterUser, contact_id: int, body: ContactUpdate
 ) -> ContactPublic:
-    contact = get_visible(session, Contact, contact_id, user)
+    contact = get_editable(session, Contact, contact_id, user)
     data = body.model_dump(exclude_unset=True)
     if "company_id" in data and data["company_id"] != contact.company_id:
         check_ref(session, Company, data["company_id"], user)
@@ -102,7 +103,7 @@ def update_contact(
 def delete_contact(session: SessionDep, user: WriterUser, contact_id: int) -> Response:
     """Moves the contact to the trash; their deals and activities keep the link, which comes
     back if they're restored."""
-    soft_delete(session, user, "contact", get_visible(session, Contact, contact_id, user))
+    soft_delete(session, user, "contact", get_editable(session, Contact, contact_id, user))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

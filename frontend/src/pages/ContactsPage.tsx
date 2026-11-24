@@ -19,7 +19,7 @@ const PAGE_SIZE = 50
 
 export function ContactsPage() {
   const { user } = useAuth()
-  const { canWrite, seesTeam } = permissions(user)
+  const { canWrite } = permissions(user)
   const navigate = useNavigate()
   const { params, set, page } = useListParams()
   const [adding, setAdding] = useState(false)
@@ -59,9 +59,7 @@ export function ContactsPage() {
             value={q}
             onChange={onSearch}
           />
-          {seesTeam && (
-            <OwnerFilter value={owner} onChange={(v) => set({ owner: v === "all" ? null : v })} />
-          )}
+          <OwnerFilter value={owner} onChange={(v) => set({ owner: v === "all" ? null : v })} />
           <SortSelect value={sort} onChange={(v) => set({ sort: v === "name" ? null : v })} />
         </div>
 
@@ -91,9 +89,7 @@ export function ContactsPage() {
                   <th className="hidden px-4 py-2 text-right font-medium whitespace-nowrap md:table-cell">
                     Open deals
                   </th>
-                  {seesTeam && (
-                    <th className="hidden px-4 py-2 font-medium xl:table-cell">Owner</th>
-                  )}
+                  <th className="hidden px-4 py-2 font-medium xl:table-cell">Owner</th>
                 </tr>
               </thead>
               <tbody
@@ -158,11 +154,9 @@ export function ContactsPage() {
                       <td className="hidden px-4 py-2.5 text-right tabular-nums md:table-cell">
                         {c.open_deal_count || <span className="text-ink-faint">0</span>}
                       </td>
-                      {seesTeam && (
-                        <td className="hidden px-4 py-2.5 text-ink-soft xl:table-cell">
-                          {c.owner?.name}
-                        </td>
-                      )}
+                      <td className="hidden px-4 py-2.5 text-ink-soft xl:table-cell">
+                        {c.owner?.name}
+                      </td>
                     </tr>
                   )
                 })}

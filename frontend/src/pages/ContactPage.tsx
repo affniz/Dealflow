@@ -24,7 +24,7 @@ import { initials } from "@/lib/utils"
 export function ContactPage() {
   const contactId = Number(useParams().contactId)
   const { user } = useAuth()
-  const { canWrite, seesTeam } = permissions(user)
+  const { canWrite } = permissions(user)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const toast = useToast()
@@ -101,7 +101,7 @@ export function ContactPage() {
               <Phone className="size-4" /> Call
             </a>
           )}
-          {canWrite && (
+          {c.can_edit && (
             <>
               <Button variant="outline" onClick={() => setDialog("edit")}>
                 <Pencil /> Edit
@@ -152,7 +152,7 @@ export function ContactPage() {
                   </Link>
                 ),
               ],
-              ...(seesTeam ? [["Owner", c.owner?.name] as [string, string | undefined]] : []),
+              ["Owner", c.owner?.name],
             ]}
             customFields={c.custom_fields}
             createdAt={c.created_at}

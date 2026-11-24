@@ -1,7 +1,12 @@
 """Record-level access rules.
 
-Owners, admins and viewers see every record. Agents see only records they own,
-and a record they can't see behaves as if it doesn't exist (404, not 403).
+Owners, admins and viewers see every record. Agents see only the deals and activities they
+own; a record they can't see behaves as if it doesn't exist (404, not 403).
+
+Companies and contacts are the team's shared address book: everyone sees them, so an agent can
+open the company on their deal and link a new deal to an existing company or person instead of
+adding a duplicate. Only the record's owner, admins and the owner role can change or delete
+one (403 for anyone else).
 """
 
 from typing import Any, TypeVar
@@ -10,31 +15,55 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlmodel import Session, SQLModel, select
 
-from app.models import Page, Role, User, utcnow
+from app.models import Company, Contact, Page, Role, User, utcnow
 
 M = TypeVar("M", bound=SQLModel)
 P = TypeVar("P", bound=SQLModel)
 
 
+# everyone sees these, whoever owns them (see the module docstring)
+SHARED: tuple[type[SQLModel], ...] = (Company, Contact)
+
+
 def sees_all(user: User) -> bool:
+    """Whether the user sees every deal and activity, not just their own."""
     return user.role != Role.agent
 
 
 def scoped(stmt: Any, model: Any, user: User) -> Any:
-    return stmt if sees_all(user) else stmt.where(model.owner_id == user.id)
+    if sees_all(user) or model in SHARED:
+        return stmt
+    return stmt.where(model.owner_id == user.id)
 
 
 def _hidden(obj: Any, user: User) -> bool:
     # session.get can hand back a row the session already holds, so check the trash here too
     if getattr(obj, "deleted_at", None) is not None:
         return True
-    return not sees_all(user) and obj.owner_id != user.id
+    return not sees_all(user) and type(obj) not in SHARED and obj.owner_id != user.id
+
+
+def can_edit(user: User, obj: Any) -> bool:
+    """Whether the user may change or delete a record they can see."""
+    return user.role != Role.viewer and (sees_all(user) or obj.owner_id == user.id)
 
 
 def get_visible(session: Session, model: type[M], obj_id: int, user: User) -> M:
     obj = session.get(model, obj_id)
     if obj is None or _hidden(obj, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{model.__name__} not found")
+    return obj
+
+
+def get_editable(session: Session, model: type[M], obj_id: int, user: User) -> M:
+    """A record the user can see and change: someone else's company or contact is visible to an
+    agent, but only its owner and admins can change it."""
+    obj = get_visible(session, model, obj_id, user)
+    if not can_edit(user, obj):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"Only this {model.__name__.lower()}'s owner or an admin can change it",
+        )
     return obj
 
 

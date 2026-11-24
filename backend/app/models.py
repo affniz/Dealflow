@@ -298,6 +298,9 @@ class CompanyPublic(CompanyBase):
     contact_count: int = 0
     open_deal_count: int = 0
     open_deal_value: Decimal = Decimal("0")
+    # whether the reader may change or delete it (agents see everyone's companies, but only
+    # change their own)
+    can_edit: bool = False
 
 
 # ---------------------------------------------------------------- contacts
@@ -350,6 +353,9 @@ class ContactPublic(ContactBase):
     owner: NamedRef | None = None
     company: NamedRef | None = None
     open_deal_count: int = 0
+    # whether the reader may change or delete it (agents see everyone's contacts, but only
+    # change their own)
+    can_edit: bool = False
 
 
 # ---------------------------------------------------------------- pipelines

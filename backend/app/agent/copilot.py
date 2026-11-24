@@ -121,7 +121,10 @@ def _turn_context(session: Session, user: User, deal_id: int | None) -> str:
         f"Signed in: {user.full_name or user.email} (user id {user.id}, role {user.role.value}).",
     ]
     if user.role == Role.agent:
-        lines.append("As an agent they see only their own deals, contacts and activities.")
+        lines.append(
+            "As an agent they see only their own deals and activities, though every company "
+            "and contact."
+        )
     if deal_id is not None:
         deal = session.get(Deal, deal_id)
         if deal is not None:

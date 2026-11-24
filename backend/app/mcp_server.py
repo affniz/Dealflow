@@ -3,7 +3,8 @@ with the CRM directly.
 
 It serves the Copilot's own tools at /mcp (Streamable HTTP), as the person whose personal
 access token is in the Authorization header. That means the same rules hold everywhere:
-- Read tools see only what that person can see (agents: their own records).
+- Read tools see only what that person can see (agents: their own deals and activities, and
+  the team's companies and contacts).
 - Change tools never change anything. They create a proposal that the person approves or
   rejects in Dealflow's Agent inbox, exactly like the Copilot's and the pipeline agent's.
 - Viewers can read but not propose.
@@ -38,7 +39,8 @@ activities (notes, calls, meetings, emails, tasks). Money is in the deal's curre
 INR; write Indian amounts in lakh and crore when that's clearer.
 
 You act as the person whose token connected you, with their access: an agent sees only their \
-own records. Call pipeline_overview for stage and lost-reason ids. The propose_* tools don't \
+own deals and activities, though every company and contact. Call pipeline_overview for stage \
+and lost-reason ids. The propose_* tools don't \
 change anything: each creates a suggestion that the person approves or rejects in Dealflow's \
 Agent inbox, so say that's where to find it. Look a deal up with get_deal before proposing a \
 change to it."""
