@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlmodel import Session, SQLModel, col, select
 
-from app.api.access import scoped
+from app.api.access import can_edit, scoped
 from app.models import (
     ActivityPublic,
     Company,
@@ -109,7 +109,8 @@ def _counts(
 def with_contact_details(
     session: Session, user: User, contacts: list[ContactPublic]
 ) -> list[ContactPublic]:
-    """Attach owner and company names and the open deals the reader can see."""
+    """Attach owner and company names, the open deals the reader can see, and whether they may
+    change it."""
     owners = user_refs(session, (c.owner_id for c in contacts))
     companies = company_refs(session, (c.company_id for c in contacts))
     open_deals = _counts(
@@ -125,6 +126,7 @@ def with_contact_details(
         c.company = _get(companies, c.company_id)
         c.company_id = c.company.id if c.company else None
         c.open_deal_count = open_deals.get(c.id, 0)
+        c.can_edit = can_edit(user, c)
     return contacts
 
 
@@ -135,7 +137,8 @@ def contact_public(session: Session, user: User, contact: Contact) -> ContactPub
 def with_company_details(
     session: Session, user: User, companies: list[CompanyPublic]
 ) -> list[CompanyPublic]:
-    """Attach owner names, contact counts and open deal totals the reader can see."""
+    """Attach owner names, contact counts and open deal totals the reader can see, and whether
+    they may change it."""
     ids = {c.id for c in companies}
     owners = user_refs(session, (c.owner_id for c in companies))
     people = _counts(session, user, Contact, Contact.company_id, ids)
@@ -152,6 +155,7 @@ def with_company_details(
         c.owner = owners.get(c.owner_id)
         c.contact_count = people.get(c.id, 0)
         c.open_deal_count, c.open_deal_value = deals.get(c.id, (0, Decimal("0")))
+        c.can_edit = can_edit(user, c)
     return companies
 
 

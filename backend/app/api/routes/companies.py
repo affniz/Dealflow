@@ -4,7 +4,15 @@ from fastapi import APIRouter, Query, Response, status
 from sqlalchemy import func
 from sqlmodel import col, or_, select
 
-from app.api.access import apply_update, get_visible, paginate, resolve_owner, save, scoped
+from app.api.access import (
+    apply_update,
+    get_editable,
+    get_visible,
+    paginate,
+    resolve_owner,
+    save,
+    scoped,
+)
 from app.api.deps import CurrentUser, SessionDep, WriterUser
 from app.models import (
     Company,
@@ -70,7 +78,7 @@ def read_company(session: SessionDep, user: CurrentUser, company_id: int) -> Com
 def update_company(
     session: SessionDep, user: WriterUser, company_id: int, body: CompanyUpdate
 ) -> CompanyPublic:
-    company = get_visible(session, Company, company_id, user)
+    company = get_editable(session, Company, company_id, user)
     before = snapshot(company)
     apply_update(session, company, user, body.model_dump(exclude_unset=True))
     if diff := changes(before, snapshot(company)):
@@ -82,7 +90,7 @@ def update_company(
 def delete_company(session: SessionDep, user: WriterUser, company_id: int) -> Response:
     """Moves the company to the trash; its people, deals and activities keep the link, which
     comes back if it's restored."""
-    soft_delete(session, user, "company", get_visible(session, Company, company_id, user))
+    soft_delete(session, user, "company", get_editable(session, Company, company_id, user))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

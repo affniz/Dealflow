@@ -226,6 +226,15 @@ def test_agent_copilot_cant_see_teammates_deals(client, login, claude, stages):
     assert view["proposals"] == []
 
 
+def test_agent_copilot_finds_teammates_contacts(client, login, claude):
+    alice, bob = login(Role.agent), login(Role.agent)
+    client.post(f"{API}/contacts", headers=alice, json={"first_name": "Priya", "last_name": "N"})
+    claude.script = [tool_call("search_contacts", {"query": "Priya"}), say("Found her.")]
+    _ask(client, bob, "Who is Priya?")
+    found = json.loads(claude.tool_results(1)[0]["content"])["contacts"]
+    assert [(c["name"], c["owner"] is not None) for c in found] == [("Priya N", True)]
+
+
 def test_viewer_cant_propose(client, login, claude, stages):
     d = _deal(client, login(Role.agent), stages[0])
     viewer = login(Role.viewer)

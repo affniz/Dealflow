@@ -27,7 +27,7 @@ import { formatMoney, initials } from "@/lib/utils"
 export function CompanyPage() {
   const companyId = Number(useParams().companyId)
   const { user } = useAuth()
-  const { canWrite, seesTeam } = permissions(user)
+  const { canWrite } = permissions(user)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const toast = useToast()
@@ -80,7 +80,7 @@ export function CompanyPage() {
             </p>
           </div>
         </div>
-        {canWrite && (
+        {c.can_edit && (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setDialog("edit")}>
               <Pencil /> Edit
@@ -140,7 +140,7 @@ export function CompanyPage() {
                   </a>
                 ),
               ],
-              ...(seesTeam ? [["Owner", c.owner?.name] as [string, string | undefined]] : []),
+              ["Owner", c.owner?.name],
             ]}
             customFields={c.custom_fields}
             createdAt={c.created_at}

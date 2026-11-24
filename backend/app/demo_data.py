@@ -95,8 +95,8 @@ DEALS = [
 def account_owners() -> dict[int, int]:
     """Contact index -> owner index, from the deals that use each contact.
 
-    A sales rep only sees contacts and companies they own, so each rep's deals must point at
-    their own accounts (otherwise the Copilot can't find or link them for that rep).
+    Every rep sees every account, but each account belongs to the rep who sells to it, so
+    the sample data checks that no two reps' deals share a contact.
     """
     owners: dict[int, int] = {}
     for title, _value, _stage, owner, contact, _days in DEALS:

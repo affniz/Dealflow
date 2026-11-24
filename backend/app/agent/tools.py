@@ -203,6 +203,9 @@ def search_contacts(ctx: ToolContext, inp: SearchContacts) -> Any:
         )
         .limit(20)
     )
+    rows = ctx.session.exec(stmt).all()
+    # everyone sees the whole address book, so say whose contact each one is
+    owners = user_refs(ctx.session, (c.owner_id for c, _ in rows))
     return {
         "contacts": [
             {
@@ -213,8 +216,9 @@ def search_contacts(ctx: ToolContext, inp: SearchContacts) -> Any:
                 "phone": c.phone,
                 "company": co.name if co else None,
                 "company_id": c.company_id,
+                "owner": owners[c.owner_id].name if c.owner_id in owners else None,
             }
-            for c, co in ctx.session.exec(stmt).all()
+            for c, co in rows
         ]
     }
 
@@ -287,7 +291,9 @@ def pipeline_overview(ctx: ToolContext, _: PipelineOverview) -> Any:
         )
     reasons = ctx.session.exec(select(LostReason).where(col(LostReason.is_active).is_(True))).all()
     return {
-        "visibility": "whole team" if sees_all(ctx.user) else "only this user's own records",
+        "visibility": "whole team"
+        if sees_all(ctx.user)
+        else "only this user's own deals and activities (every company and contact)",
         "pipelines": pipelines,
         "lost_reasons": [{"lost_reason_id": r.id, "label": r.label} for r in reasons],
     }

@@ -5552,6 +5552,11 @@
             "type": "string",
             "title": "Open Deal Value",
             "default": "0"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "default": false
           }
         },
         "type": "object",
@@ -5828,6 +5833,11 @@
             "type": "integer",
             "title": "Open Deal Count",
             "default": 0
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "default": false
           }
         },
         "type": "object",

@@ -693,6 +693,10 @@ export type CompanyPublic = {
      * Open Deal Value
      */
     open_deal_value?: string;
+    /**
+     * Can Edit
+     */
+    can_edit?: boolean;
 };
 
 /**
@@ -823,6 +827,10 @@ export type ContactPublic = {
      * Open Deal Count
      */
     open_deal_count?: number;
+    /**
+     * Can Edit
+     */
+    can_edit?: boolean;
 };
 
 /**

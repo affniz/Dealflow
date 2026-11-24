@@ -195,7 +195,10 @@ def test_contact_and_company_history(client, login):
     company_items = get(client, h, f"companies/{company['id']}/history").json()
     assert company_items[0]["data"]["changes"] == {"industry": [None, "Logistics"]}
 
-    other = login(Role.agent)  # someone who can't see the contact can't see its history
+    # a teammate sees the shared contact's history too, but not once it's in the trash
+    other = login(Role.agent)
+    assert get(client, other, f"contacts/{contact['id']}/history").json() == items
+    delete(client, h, f"contacts/{contact['id']}")
     assert get(client, other, f"contacts/{contact['id']}/history").status_code == 404
 
 

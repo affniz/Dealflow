@@ -21,7 +21,8 @@ with a person approving every change.
   it for good. Admins can also delete one for good sooner
 - Custom fields on contacts, companies and deals (stored as JSON)
 - Four roles: **owner**, **admin** (all records, settings, users),
-  **agent** (only their own records), **viewer** (read-only)
+  **agent** (their own deals and activities, plus the team's shared companies and contacts,
+  which they can link to but only change if they own them), **viewer** (read-only)
 - Sign-in sessions the server can end: the browser holds an httpOnly, SameSite=Strict cookie
   (page scripts can't read it), and a session ends after 12 hours unused, after 7 days, or at
   once on signing out, changing password, an admin resetting the password or deactivating the
@@ -56,7 +57,7 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - **Deal page**: clickable stage bar; Won, Lost (with a reason), Reopen, Edit and Delete; the
   deal's timeline of changes and activities; log a note, call or meeting, or schedule a task
 - **Contacts and companies**: searchable, sortable lists (search covers full names, email, phone
-  and company name; admins can filter by owner), kept in the URL so they survive reloads and
+  and company name; filter by owner), kept in the URL so they survive reloads and
   links. Each record has a page with its activities (to-dos first, then history), deals, people
   (for a company) and details, and is added or edited in a side panel without leaving the page
 - **My activities**: open tasks, calls, meetings and emails grouped into Overdue, Today (in your
@@ -416,6 +417,12 @@ build, and the end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls C
 - **The AI has exactly the user's access.** Tools run as the signed-in person, so an agent's
   Copilot can't read a colleague's deals, and a viewer's can't propose anything. Access rules
   live in one place (`api/access.py`) instead of being repeated in prompts.
+- **A shared address book, private pipelines.** Everyone sees every company and contact, so a
+  rep can open the company on their deal and link a new deal to an existing account instead of
+  adding a duplicate. Deals and activities stay with their owner (a company page shows a rep
+  only their own deals and notes there), and only an account's owner or an admin can change or
+  delete it. The API says which records the reader may change (`can_edit`), so the app shows
+  Edit only where it will work.
 - **Stalled deals are the agent's job.** Pipelines rarely leak because of one bad call; they
   leak because deals sit untouched. The worker flags deals that have overstayed their stage and
   the pipeline agent turns each into at most two concrete next steps, every morning, before the
