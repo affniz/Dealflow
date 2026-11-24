@@ -305,11 +305,20 @@ uv run alembic revision --autogenerate -m "describe change"   # after editing ap
 
 ```bash
 cd frontend
+npm test                      # unit and component tests (Vitest); npm run test:watch while editing
 npm run build && npm run lint
 npm run format                # Prettier
 # after changing the API, regenerate the typed client in src/client:
 (cd ../backend && uv run python scripts/export_openapi.py) && npm run generate-client
 ```
+
+Unit and component tests (Vitest, Testing Library, jsdom) sit next to the code they test
+(`src/**/*.test.ts(x)`) and need no API: `src/test/api.ts` answers the client's requests and
+records them. They cover the shared helpers (API error messages, the board's instant drag
+totals, history wording, custom fields, money and time formats, error reporting) and the
+components with behaviour worth pinning down: the Copilot's text never rendering HTML,
+approving and rejecting suggestions, sheets asking before discarding changes, the error
+screens, sign-in and session expiry, and the System status tab. They run in a few seconds.
 
 End-to-end tests (Playwright) drive the real app in Chromium: signing in, the board (including
 drag and drop), deals won and lost, contacts, activities, role access, the dashboard, settings,
@@ -324,8 +333,8 @@ npm run e2e
 
 **CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`: backend lint,
 migrations applied and checked against the models, the test suite on Postgres, a check that the
-generated API schema and client are up to date, front-end formatting, lint and build, and the
-end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
+generated API schema and client are up to date, front-end formatting, lint, unit tests and
+build, and the end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
 
 ## Product decisions
 
@@ -403,6 +412,7 @@ backend/tests/
 frontend/src/
   client/              generated API client and React Query hooks (don't edit by hand)
   lib/auth.ts          session expiry, current user, role permissions
+  test/                unit test setup: a fake API and a render helper with the app's providers
   components/          layout, route guards, UI building blocks
   pages/               one file per screen
 frontend/e2e/          Playwright end-to-end tests
