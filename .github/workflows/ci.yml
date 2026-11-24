@@ -92,6 +92,8 @@ jobs:
           }
       - run: npx prettier --check src e2e
       - run: npm run lint
+      # unit and component tests (Vitest); the job keeps its name, which main's rules require
+      - run: npm test
       - run: npm run build
 
   e2e:
