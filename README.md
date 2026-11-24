@@ -60,6 +60,11 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   and company name; filter by owner), kept in the URL so they survive reloads and
   links. Each record has a page with its activities (to-dos first, then history), deals, people
   (for a company) and details, and is added or edited in a side panel without leaving the page
+- **Duplicate warnings**: before a contact is added, or its name, email, phone or company
+  changes, Dealflow looks for the same email (ignoring case), the same phone number (on its
+  last 10 digits, so `+91 98765 43210` and `098765-43210` match) or the same name at the same
+  company, and lists who it found and whose contact they are. Nothing is blocked: "Add anyway"
+  still saves, since shared addresses like sales@ are real
 - **My activities**: open tasks, calls, meetings and emails grouped into Overdue, Today (in your
   own time zone), Upcoming and No due date; a "Done & notes" history; tick things off, edit them
   in a side panel, or add one linked to a deal, contact and company

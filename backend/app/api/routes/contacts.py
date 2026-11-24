@@ -19,11 +19,14 @@ from app.models import (
     Company,
     Contact,
     ContactCreate,
+    ContactDuplicateCheck,
+    ContactMatch,
     ContactPublic,
     ContactUpdate,
     HistoryItem,
     Page,
 )
+from app.services.duplicates import find_duplicates
 from app.services.names import contact_public, with_contact_details
 from app.services.trash import changes, history, log_record, snapshot, soft_delete
 
@@ -77,6 +80,16 @@ def create_contact(session: SessionDep, user: WriterUser, body: ContactCreate) -
     session.flush()
     log_record(session, "contact", contact.id, user, "created")  # type: ignore[arg-type]
     return contact_public(session, user, save(session, contact))
+
+
+@router.post("/duplicates", response_model=list[ContactMatch])
+def find_contact_duplicates(
+    session: SessionDep, user: WriterUser, body: ContactDuplicateCheck
+) -> list[ContactMatch]:
+    """Contacts that look like this one: the same email, the same phone number, or the same
+    name at the same company. Nothing is blocked; the app asks before adding a likely
+    duplicate. A POST, so emails and phone numbers stay out of addresses and logs."""
+    return find_duplicates(session, user, body)
 
 
 @router.get("/{contact_id}", response_model=ContactPublic)

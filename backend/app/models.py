@@ -358,6 +358,36 @@ class ContactPublic(ContactBase):
     can_edit: bool = False
 
 
+class ContactDuplicateCheck(SQLModel):
+    """A contact about to be saved, to look for people already in the CRM."""
+
+    first_name: str = Field(default="", max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    # plain strings: a half-typed address shouldn't make the check fail
+    email: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    company_id: int | None = None
+    exclude_id: int | None = Field(default=None, description="The contact being edited")
+
+
+DuplicateReason = Literal["email", "phone", "name"]
+
+
+class ContactMatch(BaseModel):
+    """An existing contact that looks like the same person, and why."""
+
+    id: int
+    name: str
+    job_title: str | None
+    email: str | None
+    phone: str | None
+    company: NamedRef | None
+    owner: NamedRef | None
+    # same email (ignoring case), same phone (its last 10 digits), or same name at the
+    # same company
+    reasons: list[DuplicateReason]
+
+
 # ---------------------------------------------------------------- pipelines
 
 

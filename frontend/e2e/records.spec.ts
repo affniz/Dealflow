@@ -17,6 +17,21 @@ test("search contacts, and the search stays in the address", async ({ page }) =>
   await expect(page.getByRole("link", { name: "Rohan Gupta" })).toHaveCount(0)
 })
 
+test("adding someone who's already there shows who has them", async ({ page }) => {
+  await signInAs(page, USERS.agent) // Arjun; Ananya Reddy is Sana's contact
+  await page.goto("/contacts")
+  await page.getByRole("button", { name: "New contact" }).click()
+  await page.getByLabel("First name").fill("Ananya")
+  await page.getByLabel("Phone").fill("098200-12223") // her number, written another way
+  await page.getByRole("button", { name: "Add contact" }).click()
+
+  const warning = page.getByRole("alert")
+  await expect(warning).toContainText("This person may already be in Dealflow")
+  await expect(warning).toContainText("same phone · Sana Qureshi's contact")
+  await expect(warning.getByRole("link", { name: "Ananya Reddy" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Add anyway" })).toBeVisible()
+})
+
 test("add a contact and log a task for them", async ({ page }) => {
   const last = unique("Verma")
   await page.goto("/contacts")
