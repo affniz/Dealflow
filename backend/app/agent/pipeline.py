@@ -106,6 +106,31 @@ def deals_to_review(session: Session, limit: int) -> list[Deal]:
     return list(session.exec(stmt).all())
 
 
+NOT_TAKEN_DAYS = 30  # how far back a review looks for its own suggestions that weren't taken
+
+
+def _not_taken(session: Session, deal: Deal) -> list[str]:
+    """The agent's recent suggestions for this deal that were rejected or expired, so a fresh
+    review (after one expired, say) doesn't just make them again."""
+    since = utcnow() - timedelta(days=NOT_TAKEN_DAYS)
+    rows = session.exec(
+        select(AgentProposal)
+        .where(
+            AgentProposal.deal_id == deal.id,
+            AgentProposal.source == "pipeline_agent",
+            col(AgentProposal.status).in_([ProposalStatus.rejected, ProposalStatus.expired]),
+            col(AgentProposal.created_at) >= since,
+        )
+        .order_by(col(AgentProposal.created_at).desc())
+        .limit(5)
+    ).all()
+    lines = []
+    for p in reversed(rows):
+        outcome = "rejected" if p.status == ProposalStatus.rejected else f"expired ({p.error})"
+        lines.append(f"- {local(p.created_at):%d %b}: {p.summary}: {outcome}")
+    return lines
+
+
 def _brief(session: Session, deal: Deal, owner: User) -> tuple[str, str]:
     stage = session.get(Stage, deal.stage_id)
     pipeline = session.get(Pipeline, deal.pipeline_id)
@@ -115,6 +140,13 @@ def _brief(session: Session, deal: Deal, owner: User) -> tuple[str, str]:
         f"{stage.name if stage else 'its stage'} (the pipeline flags deals after "
         f"{pipeline.rotting_days if pipeline else '?'} days)."
     )
+    if earlier := _not_taken(session, deal):
+        ask += (
+            "\n\nYour earlier suggestions for this deal that weren't taken:\n"
+            + "\n".join(earlier)
+            + "\nDon't suggest the same again unless something has changed since. If you "
+            "still think it's the right step, say why in your note."
+        )
     now = local(utcnow())
     context = (
         f"Now: {now:%A %d %B %Y, %H:%M} {now.tzname()} (UTC{now:%z}). You're acting for the "

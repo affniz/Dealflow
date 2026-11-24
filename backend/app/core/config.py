@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     PIPELINE_REVIEW_MAX_DEALS: int = 20  # per run, to bound cost
     PIPELINE_REVIEW_MAX_STEPS: int = 5  # model calls per deal
     PIPELINE_REVIEW_COOLDOWN_DAYS: int = 3  # don't re-review a deal sooner than this
+    # A deal with a suggestion waiting isn't reviewed again, so an unanswered one expires after
+    # this many days and the deal gets a fresh look (app.agent.proposals)
+    PIPELINE_SUGGESTION_DAYS: int = Field(default=7, ge=1)
 
     @field_validator("DATABASE_URL", "TEST_DATABASE_URL")
     @classmethod

@@ -153,7 +153,7 @@ def runs(session, job):  # noqa: ANN001, ANN201
 
 def test_a_job_run_is_recorded(session, bind):
     result = jobs.run_job("check_rotting", worker.check_rotting_job, bind=bind)
-    assert result == {"flagged": 0, "cleared": 0}
+    assert result == {"flagged": 0, "cleared": 0, "suggestions_expired": 0}
     [run] = runs(session, "check_rotting")
     assert run.status == JobStatus.succeeded and run.finished_at >= run.started_at
     assert run.result == result and run.error is None

@@ -13,6 +13,7 @@ from sqlmodel import Session
 
 from app.agent.copilot import get_client
 from app.agent.pipeline import review_stalled_deals
+from app.agent.proposals import expire_stale_suggestions
 from app.core.config import settings
 from app.core.db import engine
 from app.core.logs import setup_logging as configure_logging
@@ -75,7 +76,10 @@ def catch_up(**_: object) -> None:
 
 def check_rotting_job(session: Session) -> dict[str, object]:
     result = check_rotting(session)
-    return {"flagged": result.flagged, "cleared": result.cleared}
+    # pipeline suggestions that nobody answered, or that stopped applying, expire, so their
+    # deals come up for review again
+    expired = expire_stale_suggestions(session)
+    return {"flagged": result.flagged, "cleared": result.cleared, "suggestions_expired": expired}
 
 
 def purge_trash_job(session: Session) -> dict[str, object]:
@@ -98,12 +102,15 @@ def pipeline_review_job(session: Session) -> dict[str, object]:
     if client is None:
         return {"skipped": "AI is not configured"}
     check_rotting(session)  # make sure the stalled flags are current first
+    expired = expire_stale_suggestions(session)  # and free deals whose suggestions went stale
     s = review_stalled_deals(session, client)
     result: dict[str, object] = {
         "reviewed": s.reviewed,
         "failed": s.failed,
         "proposals": s.proposals,
     }
+    if expired:
+        result["suggestions_expired"] = expired
     if s.skipped_reason:
         result["skipped"] = s.skipped_reason
     problems = []

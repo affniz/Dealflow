@@ -102,6 +102,10 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - Bounded by design: a cap on deals per run and model calls per deal, deals with pending
   suggestions or a review in the last 3 days are skipped, one failed deal doesn't stop the run,
   and a database lock stops two workers reviewing at once
+- Suggestions don't wait forever: one nobody decides on within `PIPELINE_SUGGESTION_DAYS` (7)
+  expires, and so does one whose deal was closed or now belongs to someone else (checked every
+  hour). Its deal then comes up for review again, and the agent is told which of its earlier
+  suggestions were rejected or expired, so it doesn't just repeat them
 
 **AI model settings**
 - Admins choose the Claude model (Opus 5.5, Sonnet 5.5 or Haiku 5.5) and effort for each agent

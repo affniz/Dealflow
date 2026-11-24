@@ -73,4 +73,14 @@ describe("ProposalCard", () => {
     expect(screen.getByText("Applied")).toBeInTheDocument()
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
+
+  it("says why a suggestion expired", () => {
+    const reason = "Nobody decided on this within 7 days, so it expired"
+    renderWithApp(
+      <ProposalCard proposal={proposal({ status: "expired", error: reason })} canDecide />,
+    )
+    expect(screen.getByText("expired")).toBeInTheDocument()
+    expect(screen.getByText(reason)).toBeInTheDocument()
+    expect(screen.queryByRole("button")).not.toBeInTheDocument()
+  })
 })

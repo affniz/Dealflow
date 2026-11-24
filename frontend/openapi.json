@@ -7422,7 +7422,8 @@
           "pending",
           "approved",
           "rejected",
-          "failed"
+          "failed",
+          "expired"
         ],
         "title": "ProposalStatus"
       },
