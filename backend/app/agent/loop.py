@@ -44,6 +44,7 @@ class LoopResult:
     budget_stopped: bool = False
     final_text: str = ""
     proposal_ids: list[int] = field(default_factory=list)
+    limited_proposals: int = 0  # the ones that count toward max_proposals
 
 
 def _fallback_params(model: str) -> dict[str, Any]:
@@ -173,11 +174,14 @@ def run_loop(
                 tool_use_id=block.id,
                 proposals_left=None
                 if max_proposals is None
-                else max_proposals - len(result.proposal_ids),
+                else max_proposals - result.limited_proposals,
             )
             content, is_error = run_tool(ctx, block.name, block.input)
             if not is_error and block.name.startswith("propose_"):
-                result.proposal_ids.append(json.loads(content)["proposal_id"])
+                made = json.loads(content)
+                result.proposal_ids.append(made["proposal_id"])
+                if made.get("counts_toward_limit", True):
+                    result.limited_proposals += 1
             tool_results.append(
                 {
                     "type": "tool_result",

@@ -1,8 +1,9 @@
 """The pipeline agent: every morning it reviews stalled deals and proposes next steps.
 
 It runs without anyone watching, so it is deliberately narrow: one deal at a time, acting with
-the deal owner's access, at most two proposals per deal and a few model calls. Its proposals go
-to the owner's agent inbox; nothing changes until a person approves.
+the deal owner's access, at most two changes proposed per deal (plus closing Dealflow's own
+stalled-deal reminder) and a few model calls. Its proposals go to the owner's agent inbox;
+nothing changes until a person approves.
 """
 
 import logging
@@ -56,7 +57,7 @@ reason from pipeline_overview.
    Don't duplicate an open task a person already planned, and don't invent facts.
    The history may include an automatic stalled-deal reminder from Dealflow. It's a generic \
 nudge, not a plan: never treat it as covering the next step. When you propose a specific \
-follow-up, also propose completing that reminder (it counts toward your two proposals).
+follow-up, also propose completing that reminder; that doesn't count toward your two changes.
 3. Finish with a note to the owner in one or two sentences: what's going on and what you \
 proposed. Write it to them directly ("You last spoke to Priya..."), with no greeting.
 

@@ -328,10 +328,13 @@ def _propose(
     summary: str,
     rationale: str,
     deal: Deal | None = None,
+    counts: bool = True,
 ) -> Any:
+    """Create an approval card. `counts=False` for housekeeping (closing Dealflow's own
+    stalled-deal reminder), which a review may do on top of its limit of real changes."""
     if ctx.user.role == Role.viewer:
         raise ToolError("This user is a viewer and can't change anything; just answer in words.")
-    if ctx.proposals_left is not None and ctx.proposals_left <= 0:
+    if counts and ctx.proposals_left is not None and ctx.proposals_left <= 0:
         raise ToolError("You've reached the maximum number of proposals for this review.")
     proposal = AgentProposal(
         source=ctx.source,
@@ -347,12 +350,15 @@ def _propose(
     )
     ctx.session.add(proposal)
     ctx.session.flush()
-    return {
+    result = {
         "proposal_id": proposal.id,
         "status": "pending approval",
         "summary": proposal.summary,
         "note": "Nothing has changed yet. The user sees this as a card and approves or rejects it.",
     }
+    if not counts:
+        result["counts_toward_limit"] = False
+    return result
 
 
 def _open_deal(ctx: ToolContext, deal_id: int) -> Deal:
@@ -473,7 +479,14 @@ def propose_complete_activity(ctx: ToolContext, inp: CompleteActivity) -> Any:
     deal = ctx.session.get(Deal, activity.deal_id) if activity.deal_id else None
     summary = f"Mark {activity.type.value} “{activity.subject}” as done"
     return _propose(
-        ctx, "complete_activity", {"activity_id": activity.id}, summary, inp.reason, deal
+        ctx,
+        "complete_activity",
+        {"activity_id": activity.id},
+        summary,
+        inp.reason,
+        deal,
+        # closing Dealflow's generic reminder is housekeeping, not one of the review's changes
+        counts=activity.via != AUTO_REMINDER,
     )
 
 
