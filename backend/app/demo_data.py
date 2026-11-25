@@ -165,10 +165,11 @@ def loaded_on(session: Session) -> datetime | None:
 def _users(session: Session) -> list[User]:
     """The owner, then the demo team, created or put back as they were."""
     users = [session.exec(select(User).where(User.role == Role.owner)).one()]
+    hashed = hash_password(PASSWORD)  # one slow hash, shared by the whole demo team
     for email, name, role in USERS:
-        u = session.exec(select(User).where(User.email == email)).first() or User(email=email)
-        u.full_name, u.role, u.is_active = name, role, True
-        u.hashed_password = hash_password(PASSWORD)
+        found = session.exec(select(User).where(User.email == email)).first()
+        u = found or User(email=email, hashed_password=hashed)
+        u.full_name, u.role, u.is_active, u.hashed_password = name, role, True, hashed
         session.add(u)
         users.append(u)
     session.flush()
@@ -199,9 +200,9 @@ def _populate(session: Session) -> None:
     companies = []
     for i, (name, domain, industry) in enumerate(COMPANIES):
         owner = sellers[owner_of_company.get(i, 0)]
-        c = Company(name=name, domain=domain, industry=industry, owner_id=owner.id)
-        session.add(c)
-        companies.append(c)
+        co = Company(name=name, domain=domain, industry=industry, owner_id=owner.id)  # type: ignore[arg-type]
+        session.add(co)
+        companies.append(co)
     session.flush()
 
     contacts = []
@@ -213,7 +214,7 @@ def _populate(session: Session) -> None:
             email=f"{first.lower()}@{COMPANIES[ci][1]}",
             phone=f"+91 98{ci}00 1{ci}2{ci}3",
             company_id=companies[ci].id,
-            owner_id=sellers[owner_of_contact.get(index, 0)].id,
+            owner_id=sellers[owner_of_contact.get(index, 0)].id,  # type: ignore[arg-type]
         )
         session.add(c)
         contacts.append(c)

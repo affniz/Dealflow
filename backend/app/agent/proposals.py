@@ -39,10 +39,10 @@ def _apply(session: Session, p: AgentProposal, user: User) -> None:
         actions.mark_lost(
             session,
             user,
-            p.deal_id,
+            p.deal_id,  # type: ignore[arg-type]
             params["lost_reason_id"],
             params.get("note"),
-            via=via,  # type: ignore[arg-type]
+            via=via,
         )
     elif p.action == "log_activity":
         body = ActivityCreate.model_validate({**params, "owner_id": p.user_id})
@@ -121,7 +121,7 @@ def expire_stale_suggestions(session: Session) -> int:
         select(AgentProposal, Deal)
         .join(Deal, col(Deal.id) == AgentProposal.deal_id, isouter=True)
         .where(AgentProposal.source == PIPELINE, AgentProposal.status == ProposalStatus.pending)
-        .with_for_update(of=AgentProposal, skip_locked=True)  # type: ignore[arg-type]
+        .with_for_update(of=AgentProposal, skip_locked=True)
     ).all()
     expired = 0
     for proposal, deal in rows:

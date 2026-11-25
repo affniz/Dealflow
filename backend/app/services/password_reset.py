@@ -39,7 +39,7 @@ def create_link(
     expiry. Commits."""
     token = generate_api_token()  # long and random, like a personal access token
     expires = utcnow() + lifetime
-    session.exec(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    session.exec(delete(PasswordResetToken).where(col(PasswordResetToken.user_id) == user.id))
     session.add(
         PasswordResetToken(
             user_id=user.id,  # type: ignore[arg-type]
@@ -87,10 +87,10 @@ def reset_password(session: Session, token: str, new_password: str) -> User:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, INVALID)
     user.hashed_password = hash_password(new_password)
     session.add(user)
-    session.exec(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    session.exec(delete(PasswordResetToken).where(col(PasswordResetToken.user_id) == user.id))
     end_sessions(session, user.id)  # type: ignore[arg-type]
     # a fresh start for whoever was locked out by wrong guesses
-    session.exec(delete(LoginFailure).where(LoginFailure.email == user.email))
+    session.exec(delete(LoginFailure).where(col(LoginFailure.email) == user.email))
     session.commit()
     return user
 

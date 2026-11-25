@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import ColumnElement
 from sqlmodel import col, select
 
 from app.api.access import scoped
@@ -28,9 +29,9 @@ def pipeline_board(
     if pipeline is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Pipeline not found")
 
-    filters = []
+    filters: list[ColumnElement[bool]] = []
     if owner_id is not None:
-        filters.append(Deal.owner_id == owner_id)
+        filters.append(col(Deal.owner_id) == owner_id)
     if rotting is not None:
         flag = col(Deal.rotting_since)
         filters.append(flag.is_not(None) if rotting else flag.is_(None))

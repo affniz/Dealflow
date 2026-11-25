@@ -103,7 +103,7 @@ def history(
     names = user_refs(session, (e.actor_id for e in events))
     return [
         HistoryItem(
-            id=e.id,  # type: ignore[arg-type]
+            id=e.id,
             kind=e.kind,
             data=e.data,
             created_at=e.created_at,
@@ -128,7 +128,7 @@ def soft_delete(session: Session, user: User, record_type: RecordType, row: Any)
             update(AgentProposal)
             .where(
                 col(AgentProposal.deal_id) == row.id,
-                AgentProposal.status == ProposalStatus.pending,
+                col(AgentProposal.status) == ProposalStatus.pending,
             )
             .values(status=ProposalStatus.failed, error="The deal was deleted")
         )
@@ -173,19 +173,23 @@ def purge(session: Session, record_type: str, record_id: int) -> None:
                 update(linked).where(col(linked.deal_id) == record_id).values(deal_id=None)
             )
     elif record_type == "contact":
-        for linked in (Deal, Activity):
+        for to_contact in (Deal, Activity):
             session.exec(
-                update(linked).where(col(linked.contact_id) == record_id).values(contact_id=None)
+                update(to_contact)
+                .where(col(to_contact.contact_id) == record_id)
+                .values(contact_id=None)
             )
     elif record_type == "company":
-        for linked in (Contact, Deal, Activity):
+        for to_company in (Contact, Deal, Activity):
             session.exec(
-                update(linked).where(col(linked.company_id) == record_id).values(company_id=None)
+                update(to_company)
+                .where(col(to_company.company_id) == record_id)
+                .values(company_id=None)
             )
     if record_type in ("contact", "company"):
         session.exec(
             delete(RecordEvent).where(
-                RecordEvent.record_type == record_type, col(RecordEvent.record_id) == record_id
+                col(RecordEvent.record_type) == record_type, col(RecordEvent.record_id) == record_id
             )
         )
     session.exec(delete(model).where(col(model.id) == record_id))
@@ -239,7 +243,7 @@ def trash(session: Session, user: User) -> list[TrashItem]:
     names = user_refs(session, (row.deleted_by_id for _, row in rows))
     items = [
         TrashItem(
-            type=record_type,  # type: ignore[arg-type]
+            type=record_type,
             id=row.id,
             name=_name(record_type, row),
             deleted_at=row.deleted_at,

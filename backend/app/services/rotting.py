@@ -73,7 +73,7 @@ def check_rotting(session: Session, now: datetime | None = None) -> RottingResul
         .join(Pipeline, col(Pipeline.id) == Deal.pipeline_id)
         .where(
             col(Deal.rotting_since).is_not(None),
-            or_(Deal.status != DealStatus.open, not_(_is_stale(now))),
+            or_(col(Deal.status) != DealStatus.open, not_(_is_stale(now))),
         )
         .with_for_update(skip_locked=True, of=Deal)
     ).all()

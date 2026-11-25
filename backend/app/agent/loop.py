@@ -31,7 +31,8 @@ REFUSAL_REPLY = "Sorry, I can't help with that one."
 class MessagesClient(Protocol):
     """The slice of `anthropic.Anthropic` used here, so tests can pass a fake."""
 
-    beta: Any
+    @property
+    def beta(self) -> Any: ...
 
 
 @dataclass

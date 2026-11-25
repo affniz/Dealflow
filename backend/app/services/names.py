@@ -103,7 +103,7 @@ def _counts(
     if not ids:
         return {}
     stmt = scoped(select(key, func.count()), model, user).where(col(key).in_(ids), *where)
-    return dict(session.exec(stmt.group_by(key)).all())  # type: ignore[arg-type]
+    return dict(session.exec(stmt.group_by(key)).all())
 
 
 def with_contact_details(
@@ -150,7 +150,7 @@ def with_company_details(
             user,
         ).where(col(Deal.company_id).in_(ids), Deal.status == DealStatus.open)
         for company_id, count, value in session.exec(stmt.group_by(Deal.company_id)).all():
-            deals[company_id] = (count, Decimal(value))  # type: ignore[index]
+            deals[company_id] = (count, Decimal(value))
     for c in companies:
         c.owner = owners.get(c.owner_id)
         c.contact_count = people.get(c.id, 0)

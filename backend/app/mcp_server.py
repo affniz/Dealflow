@@ -14,7 +14,7 @@ import inspect
 import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
-from typing import Annotated, Any, get_args
+from typing import Annotated, Any, cast, get_args
 
 import anyio.to_thread
 from mcp.server.mcpserver import Context, MCPServer
@@ -59,7 +59,7 @@ def _session() -> Iterator[Session]:
         yield made
         return
     try:
-        yield next(made)
+        yield cast(Session, next(made))  # get_session, or a test override, yields a Session
     finally:
         made.close()
 
@@ -112,10 +112,10 @@ def _register(tool: Tool) -> None:
         description=tool.description,
         annotations=ToolAnnotations(
             # proposals don't change records, but they do add something for a person to review
-            readOnlyHint=not tool.proposes_change,
-            destructiveHint=False,
-            idempotentHint=not tool.proposes_change,
-            openWorldHint=False,
+            read_only_hint=not tool.proposes_change,
+            destructive_hint=False,
+            idempotent_hint=not tool.proposes_change,
+            open_world_hint=False,
         ),
         structured_output=False,
     )

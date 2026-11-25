@@ -45,7 +45,7 @@ def pipeline_summary(
         t = by_stage.get(stage.id, StageTotals())  # type: ignore[arg-type]
         stages.append(
             StageSummary(
-                stage_id=stage.id,  # type: ignore[arg-type]
+                stage_id=stage.id,
                 name=stage.name,
                 probability=stage.probability,
                 deal_count=t.count,

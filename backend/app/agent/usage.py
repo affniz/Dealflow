@@ -138,7 +138,7 @@ def summary(session: Session, month: str | None) -> UsageSummary:
             func.count(func.distinct(AIUsage.turn_id)),
         )
         .where(*in_month)
-        .group_by(AIUsage.user_id, AIUsage.feature)
+        .group_by(col(AIUsage.user_id), col(AIUsage.feature))
     ).all():
         entry = per_user.setdefault(
             user_id, {"copilot": Decimal(0), "pipeline": Decimal(0), "questions": 0}
@@ -154,7 +154,9 @@ def summary(session: Session, month: str | None) -> UsageSummary:
     }
     by_user = [
         UserUsage(
-            user=NamedRef(id=uid, name=user_name(users[uid])) if uid in users else None,
+            user=NamedRef(id=uid, name=user_name(users[uid]))
+            if uid is not None and uid in users
+            else None,
             copilot_cost_usd=v["copilot"],
             pipeline_cost_usd=v["pipeline"],
             copilot_questions=v["questions"],

@@ -109,7 +109,8 @@ def apply_update(session: Session, obj: Any, user: User, data: dict[str, Any]) -
 def paginate(session: Session, stmt: Any, public: type[P], skip: int, limit: int) -> Page[P]:
     count = session.exec(select(func.count()).select_from(stmt.subquery())).one()
     rows = session.exec(stmt.offset(skip).limit(limit)).all()
-    return Page[public](data=[public.model_validate(r) for r in rows], count=count)
+    # a Page of whichever public model was passed, so FastAPI documents the right fields
+    return Page[public](data=[public.model_validate(r) for r in rows], count=count)  # type: ignore[valid-type]
 
 
 def save(session: Session, obj: M) -> M:

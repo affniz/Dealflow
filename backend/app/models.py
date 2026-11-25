@@ -123,8 +123,8 @@ class UserCreate(UserBase):
 class UserUpdate(SQLModel):
     email: EmailStr = Field(default=None, max_length=255)
     full_name: str | None = Field(default=None, max_length=255)
-    role: Role = None
-    is_active: bool = None
+    role: Role = Field(default=None)
+    is_active: bool = Field(default=None)
     password: str = Field(default=None, min_length=8, max_length=128)
 
 
@@ -281,8 +281,8 @@ class CompanyUpdate(SQLModel):
     domain: str | None = Field(default=None, max_length=255)
     industry: str | None = Field(default=None, max_length=100)
     phone: str | None = Field(default=None, max_length=50)
-    owner_id: int = None
-    custom_fields: dict[str, Any] = None
+    owner_id: int = Field(default=None)
+    custom_fields: dict[str, Any] = Field(default=None)
 
 
 class CompanyPublic(CompanyBase):
@@ -338,8 +338,8 @@ class ContactUpdate(SQLModel):
     phone: str | None = Field(default=None, max_length=50)
     job_title: str | None = Field(default=None, max_length=100)
     company_id: int | None = None
-    owner_id: int = None
-    custom_fields: dict[str, Any] = None
+    owner_id: int = Field(default=None)
+    custom_fields: dict[str, Any] = Field(default=None)
 
 
 class ContactPublic(ContactBase):
@@ -469,7 +469,7 @@ class StageOrder(SQLModel):
 
 class LostReasonUpdate(SQLModel):
     label: str = Field(default=None, min_length=1, max_length=100)
-    is_active: bool = None
+    is_active: bool = Field(default=None)
 
 
 class LostReasonPublic(LostReasonBase):
@@ -522,9 +522,9 @@ class DealUpdate(SQLModel):
     expected_close_date: date | None = None
     contact_id: int | None = None
     company_id: int | None = None
-    stage_id: int = None
-    owner_id: int = None
-    custom_fields: dict[str, Any] = None
+    stage_id: int = Field(default=None)
+    owner_id: int = Field(default=None)
+    custom_fields: dict[str, Any] = Field(default=None)
 
 
 class DealLost(SQLModel):
@@ -651,15 +651,15 @@ class ActivityCreate(ActivityBase):
 
 
 class ActivityUpdate(SQLModel):
-    type: ActivityType = None
+    type: ActivityType = Field(default=None)
     subject: str = Field(default=None, min_length=1, max_length=255)
     body: str | None = None
     due_at: datetime | None = None
     deal_id: int | None = None
     contact_id: int | None = None
     company_id: int | None = None
-    owner_id: int = None
-    done: bool = None
+    owner_id: int = Field(default=None)
+    done: bool = Field(default=None)
 
     @field_validator("due_at")
     @classmethod

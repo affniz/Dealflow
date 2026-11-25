@@ -34,7 +34,8 @@ def add_missing(session: Session) -> None:
     if session.exec(select(Pipeline)).first() is None:
         pipeline = Pipeline(name="Sales")
         pipeline.stages = [
-            Stage(name=name, position=i, probability=p)
+            # pipeline_id is filled in from the pipeline when it is saved
+            Stage(name=name, position=i, probability=p)  # type: ignore[call-arg]
             for i, (name, p) in enumerate(DEFAULT_STAGES)
         ]
         session.add(pipeline)
