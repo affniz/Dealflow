@@ -1,0 +1,56 @@
+name: Dependency audit
+
+# Checks the locked Python and npm packages against published security advisories: when a pull
+# request changes them, and every Monday for advisories published since. A new advisory then
+# shows up here instead of failing someone's unrelated pull request.
+on:
+  pull_request:
+    paths: &dependency-files
+      - backend/pyproject.toml
+      - backend/uv.lock
+      - frontend/package.json
+      - frontend/package-lock.json
+      - .github/workflows/audit.yml
+  push:
+    branches: [main]
+    paths: *dependency-files
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python packages
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          # `uv audit` is still experimental, so stay on a version known to work
+          version: "0.13.9"
+      # every locked package, dev tools included, against the OSV database
+      - run: uv audit --locked --preview-features audit-command
+
+  npm:
+    name: npm packages
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # reads package-lock.json, so nothing needs installing; low-severity findings don't fail it
+      - run: npm audit --audit-level=moderate

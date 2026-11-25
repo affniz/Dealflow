@@ -424,6 +424,12 @@ migrations applied and checked against the models, the test suite on Postgres, a
 generated API schema and client are up to date, front-end formatting, lint, unit tests and
 build, and the end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
 
+**Dependency audit** (`.github/workflows/audit.yml`) checks the locked Python and npm packages
+against published security advisories (`uv audit` and `npm audit`) when a pull request changes
+them, and every Monday for advisories published since. To run it locally:
+`uv audit --locked --preview-features audit-command` in `backend/`, and
+`npm audit --audit-level=moderate` in `frontend/`.
+
 ## Product decisions
 
 - **The AI proposes; a person approves.** CRM data feeds forecasts and commissions, so a wrong
