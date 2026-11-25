@@ -23,7 +23,7 @@ def claim_daily_run(session: Session, key: str, hour: int, now: datetime | None 
     today = local(now or utcnow())
     if today.hour < hour:
         return False
-    session.exec(insert(AppSetting).values(key=key, value={}).on_conflict_do_nothing())  # type: ignore[call-overload]
+    session.exec(insert(AppSetting).values(key=key, value={}).on_conflict_do_nothing())
     row = session.exec(
         select(AppSetting)
         .where(AppSetting.key == key)

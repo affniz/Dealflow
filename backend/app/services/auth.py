@@ -80,7 +80,9 @@ def authenticate(session: Session, email: str, password: str, ip: str) -> User:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Incorrect email or password")
     if not user.is_active:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Inactive user")
-    session.exec(delete(LoginFailure).where(LoginFailure.email == email, LoginFailure.ip == ip))
+    session.exec(
+        delete(LoginFailure).where(col(LoginFailure.email) == email, col(LoginFailure.ip) == ip)
+    )
     return user
 
 
@@ -151,13 +153,13 @@ def end_session(session: Session, token: str) -> None:
         session_id = int(payload["sid"])
     except (jwt.InvalidTokenError, KeyError, ValueError, TypeError):
         return
-    session.exec(delete(AuthSession).where(AuthSession.id == session_id))
+    session.exec(delete(AuthSession).where(col(AuthSession.id) == session_id))
     session.commit()
 
 
 def end_sessions(session: Session, user_id: int, keep: int | None = None) -> None:
     """Sign this person out everywhere (except the session `keep`). Doesn't commit."""
-    stmt = delete(AuthSession).where(AuthSession.user_id == user_id)
+    stmt = delete(AuthSession).where(col(AuthSession.user_id) == user_id)
     if keep is not None:
-        stmt = stmt.where(AuthSession.id != keep)
+        stmt = stmt.where(col(AuthSession.id) != keep)
     session.exec(stmt)

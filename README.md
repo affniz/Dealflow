@@ -388,6 +388,7 @@ To add a scenario:
 cd backend
 uv run pytest                 # runs against the dealflow_test database
 uv run ruff check . && uv run ruff format .
+uv run mypy                    # type-checks app/, as CI does
 uv run alembic revision --autogenerate -m "describe change"   # after editing app/models.py
 ```
 

@@ -48,7 +48,7 @@ def _proposals_public(session: Session, rows: list[AgentProposal]) -> list[Agent
     for p in rows:
         pub = AgentProposalPublic.model_validate(p)
         if p.deal_id in titles:
-            pub.deal = NamedRef(id=p.deal_id, name=titles[p.deal_id])  # type: ignore[arg-type]
+            pub.deal = NamedRef(id=p.deal_id, name=titles[p.deal_id])
         else:
             pub.deal_id = None  # deleted: no link while it's in the trash
         out.append(pub)
@@ -65,7 +65,9 @@ _STEP_LABELS = {
 }
 
 
-def _step_label(session: Session, name: str, inp: dict[str, Any], titles: dict[int, str]) -> str:
+def _step_label(
+    session: Session, name: str, inp: dict[str, Any], titles: dict[int | None, str]
+) -> str:
     if name == "get_deal" and isinstance(inp.get("deal_id"), int) and inp["deal_id"] in titles:
         return f"Read “{titles[inp['deal_id']]}”"
     if name == "search_deals" and inp.get("query"):
@@ -131,7 +133,7 @@ def _view(session: Session, conv: AgentConversation) -> ConversationView:
     elif conv.turn_error:
         failure = TurnFailure.model_validate(conv.turn_error)
     return ConversationView(
-        id=conv.id,  # type: ignore[arg-type]
+        id=conv.id,
         title=conv.title,
         model=conv.model,
         items=items,
@@ -211,7 +213,7 @@ def _start_turn(session: Session, user: User, body: CopilotMessageIn) -> AgentCo
         # withdraw what it proposed before starting afresh, in the same transaction
         turns.end_failed_turn(
             session,
-            conv.id,  # type: ignore[arg-type]
+            conv.id,
             conv.turn_started_at,
             turns.INTERRUPTED,
             turns.turn_text(conv),
@@ -265,7 +267,7 @@ def list_conversations(session: SessionDep, user: CurrentUser) -> list[Conversat
         .order_by(col(AgentConversation.updated_at).desc())
         .limit(30)
     ).all()
-    return [ConversationSummary(id=c.id, title=c.title, updated_at=c.updated_at) for c in rows]  # type: ignore[arg-type]
+    return [ConversationSummary(id=c.id, title=c.title, updated_at=c.updated_at) for c in rows]
 
 
 @router.get("/copilot/conversations/{conversation_id}", response_model=ConversationView)
@@ -310,7 +312,7 @@ def list_agent_runs(
             session.exec(
                 select(AgentProposal.run_id, func.count())
                 .where(col(AgentProposal.run_id).in_(run_ids))
-                .group_by(AgentProposal.run_id)
+                .group_by(col(AgentProposal.run_id))
             ).all()
         )
         if run_ids
@@ -326,7 +328,7 @@ def list_agent_runs(
     for r in runs:
         pub = AgentRunPublic.model_validate(r, update={"proposal_count": counts.get(r.id, 0)})
         if r.deal_id in titles:
-            pub.deal = NamedRef(id=r.deal_id, name=titles[r.deal_id])  # type: ignore[arg-type]
+            pub.deal = NamedRef(id=r.deal_id, name=titles[r.deal_id])
         else:
             pub.deal_id = None  # deleted: no link while it's in the trash
         out.append(pub)

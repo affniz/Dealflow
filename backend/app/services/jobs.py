@@ -184,7 +184,7 @@ def prune(session: Session, now: datetime | None = None) -> int:
     cutoff = (now or utcnow()) - timedelta(days=JOB_RUN_DAYS)
     deleted = session.exec(delete(JobRun).where(col(JobRun.started_at) < cutoff))
     session.commit()
-    return deleted.rowcount or 0  # type: ignore[attr-defined]
+    return deleted.rowcount or 0
 
 
 # ------------------------------------------------------------------ the status page

@@ -6,7 +6,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.api.access import scoped
 from app.models import Deal, DealStatus, User
@@ -37,7 +37,9 @@ def open_totals_by_stage(
     `filters` are extra WHERE clauses on Deal (e.g. a single owner).
     """
     stmt = scoped(
-        select(Deal.stage_id, func.count(), func.sum(Deal.value), func.count(Deal.rotting_since)),
+        select(
+            Deal.stage_id, func.count(), func.sum(Deal.value), func.count(col(Deal.rotting_since))
+        ),
         Deal,
         user,
     ).where(Deal.pipeline_id == pipeline_id, Deal.status == DealStatus.open, *filters)

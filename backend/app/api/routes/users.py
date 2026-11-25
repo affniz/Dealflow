@@ -52,7 +52,7 @@ def change_password(
 def user_directory(session: SessionDep, _: CurrentUser) -> list[UserDirectoryEntry]:
     """Active users' names and roles, for owner pickers and showing who did what."""
     users = session.exec(select(User).where(col(User.is_active).is_(True)).order_by(col(User.id)))
-    return [UserDirectoryEntry(id=u.id, name=user_name(u), role=u.role) for u in users]  # type: ignore[arg-type]
+    return [UserDirectoryEntry(id=u.id, name=user_name(u), role=u.role) for u in users]
 
 
 @router.get("", response_model=Page[UserPublic])

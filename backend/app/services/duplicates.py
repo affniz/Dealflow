@@ -90,7 +90,7 @@ def find_duplicates(
     owners = user_refs(session, (c.owner_id for c, _ in found))
     return [
         ContactMatch(
-            id=c.id,  # type: ignore[arg-type]
+            id=c.id,
             name=contact_name(c),
             job_title=c.job_title,
             email=c.email,

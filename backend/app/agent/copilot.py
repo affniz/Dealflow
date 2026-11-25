@@ -91,11 +91,13 @@ def get_client() -> MessagesClient | None:
     if not settings.AI_ENABLED:
         return None
     # a call that hangs must end well inside a Copilot turn's time limit (turns.TURN_TIMEOUT)
-    limits = {"timeout": settings.CLAUDE_TIMEOUT_SECONDS, "max_retries": 2}
+    timeout, retries = settings.CLAUDE_TIMEOUT_SECONDS, 2
     if settings.ANTHROPIC_API_KEY:
-        return anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, **limits)
+        return anthropic.Anthropic(
+            api_key=settings.ANTHROPIC_API_KEY, timeout=timeout, max_retries=retries
+        )
     if _sdk_has_credentials():
-        return anthropic.Anthropic(**limits)
+        return anthropic.Anthropic(timeout=timeout, max_retries=retries)
     return None
 
 
