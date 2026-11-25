@@ -40,6 +40,7 @@ from app.models import (
 )
 from app.services.names import contact_name, user_refs, with_deal_names
 from app.services.rotting import AUTO_REMINDER
+from app.services.search import contains
 from app.services.stats import money, open_totals_by_stage, weighted
 
 
@@ -117,7 +118,7 @@ class SearchDeals(BaseModel):
 def search_deals(ctx: ToolContext, inp: SearchDeals) -> Any:
     stmt = scoped(select(Deal), Deal, ctx.user)
     if inp.query:
-        stmt = stmt.where(col(Deal.title).ilike(f"%{inp.query}%"))
+        stmt = stmt.where(contains(Deal.title, inp.query))
     if inp.status != "any":
         stmt = stmt.where(Deal.status == inp.status)
     if inp.stalled_only:
@@ -188,17 +189,16 @@ class SearchContacts(BaseModel):
 
 
 def search_contacts(ctx: ToolContext, inp: SearchContacts) -> Any:
-    like = f"%{inp.query}%"
+    full_name = func.concat_ws(" ", Contact.first_name, Contact.last_name)
     stmt = (
         scoped(select(Contact, Company), Contact, ctx.user)
         .join(Company, col(Company.id) == Contact.company_id, isouter=True)
         .where(
             or_(
-                col(Contact.first_name).ilike(like),
-                col(Contact.last_name).ilike(like),
-                col(Contact.email).ilike(like),
-                col(Contact.phone).ilike(like),
-                col(Company.name).ilike(like),
+                contains(full_name, inp.query),
+                contains(Contact.email, inp.query),
+                contains(Contact.phone, inp.query),
+                contains(Company.name, inp.query),
             )
         )
         .limit(20)

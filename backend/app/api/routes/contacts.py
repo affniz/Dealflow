@@ -28,6 +28,7 @@ from app.models import (
 )
 from app.services.duplicates import find_duplicates
 from app.services.names import contact_public, with_contact_details
+from app.services.search import contains
 from app.services.trash import changes, history, log_record, snapshot, soft_delete
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
@@ -46,14 +47,13 @@ def list_contacts(
 ) -> Page[ContactPublic]:
     stmt = scoped(select(Contact), Contact, user)
     if q:
-        like = f"%{q.strip()}%"
         full_name = func.concat_ws(" ", Contact.first_name, Contact.last_name)
         stmt = stmt.outerjoin(Company, col(Company.id) == col(Contact.company_id)).where(
             or_(
-                full_name.ilike(like),
-                col(Contact.email).ilike(like),
-                col(Contact.phone).ilike(like),
-                col(Company.name).ilike(like),
+                contains(full_name, q),
+                contains(Contact.email, q),
+                contains(Contact.phone, q),
+                contains(Company.name, q),
             )
         )
     if company_id is not None:

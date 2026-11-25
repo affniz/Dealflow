@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services import actions
 from app.services.names import deal_public, user_refs, with_activity_names, with_deal_names
+from app.services.search import contains
 from app.services.trash import soft_delete
 
 router = APIRouter(prefix="/deals", tags=["deals"])
@@ -48,7 +49,7 @@ def list_deals(
         flag = col(Deal.rotting_since)
         stmt = stmt.where(flag.is_not(None) if rotting else flag.is_(None))
     if q:
-        stmt = stmt.where(col(Deal.title).ilike(f"%{q}%"))
+        stmt = stmt.where(contains(Deal.title, q))
     filters = {
         Deal.pipeline_id: pipeline_id,
         Deal.stage_id: stage_id,

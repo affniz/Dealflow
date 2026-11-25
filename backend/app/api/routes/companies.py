@@ -23,6 +23,7 @@ from app.models import (
     Page,
 )
 from app.services.names import company_public, with_company_details
+from app.services.search import contains
 from app.services.trash import changes, history, log_record, snapshot, soft_delete
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -40,12 +41,11 @@ def list_companies(
 ) -> Page[CompanyPublic]:
     stmt = scoped(select(Company), Company, user)
     if q:
-        like = f"%{q.strip()}%"
         stmt = stmt.where(
             or_(
-                col(Company.name).ilike(like),
-                col(Company.domain).ilike(like),
-                col(Company.industry).ilike(like),
+                contains(Company.name, q),
+                contains(Company.domain, q),
+                contains(Company.industry, q),
             )
         )
     if owner_id is not None:

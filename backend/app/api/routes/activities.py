@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services import actions
 from app.services.names import with_activity_names
+from app.services.search import contains
 from app.services.trash import soft_delete
 
 router = APIRouter(prefix="/activities", tags=["activities"])
@@ -79,8 +80,7 @@ def list_activities(
     if has_due is not None:
         stmt = stmt.where(due.is_not(None) if has_due else due.is_(None))
     if q:
-        like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(col(Activity.subject).ilike(like), col(Activity.body).ilike(like)))
+        stmt = stmt.where(or_(contains(Activity.subject, q), contains(Activity.body, q)))
     if sort == "recent":
         happened = func.coalesce(Activity.done_at, Activity.created_at)
         stmt = stmt.order_by(happened.desc(), col(Activity.id).desc())
