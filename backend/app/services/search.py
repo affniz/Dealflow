@@ -18,6 +18,4 @@ def escape_like(text: str) -> str:
 
 def contains(column: Any, text: str) -> ColumnElement[bool]:
     """The column (a model field or an SQL expression) contains this text, ignoring case."""
-    return column.ilike(  # type: ignore[no-any-return]
-        f"%{escape_like(text.strip())}%", escape=ESCAPE
-    )
+    return column.ilike(f"%{escape_like(text.strip())}%", escape=ESCAPE)
