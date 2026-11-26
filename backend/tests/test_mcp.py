@@ -270,3 +270,22 @@ def test_only_a_request_with_a_suggest_token_is_offered_proposals():
     tools = {t.name for t in anyio.run(server.list_tools)}
     assert "search_deals" in tools
     assert not {t for t in tools if t.startswith("propose_")}
+
+
+def test_hourly_cleanup_deletes_tokens_a_month_after_they_expire(client, login, session):
+    from app.worker import purge_trash_job
+
+    h = login(Role.agent)
+    for name in ("Live", "Lately", "Long gone"):
+        _token(client, h, name)
+    now = utcnow()
+    expired = {"Lately": now - timedelta(days=29), "Long gone": now - timedelta(days=31)}
+    for row in session.exec(select(ApiToken)).all():
+        if row.name in expired:
+            row.expires_at = expired[row.name]
+            session.add(row)
+    session.commit()
+
+    assert purge_trash_job(session)["expired_tokens"] == 1
+    listed = {t["name"] for t in client.get(f"{API}/users/me/tokens", headers=h).json()}
+    assert listed == {"Live", "Lately"}

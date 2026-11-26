@@ -64,7 +64,7 @@ describe("Connect Claude", () => {
     // its last week: picked out in amber
     expect(within(helper).getByText("in 3 days").parentElement).toHaveClass("text-amber-700")
     expect(await row("Old laptop")).toHaveTextContent(
-      "Expired 2 days ago. Revoke it, and create a new one if you still need it.",
+      "Expired 2 days ago. Create a new one if you still need it; this one goes from the list 30 days after it expired.",
     )
   })
 

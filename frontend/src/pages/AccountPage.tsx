@@ -356,6 +356,8 @@ const SCOPES: Record<Scope, { label: string; short: string; hint: string }> = {
 }
 
 const EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000
+// the API's hourly cleanup deletes a token this long after it expires (KEEP_EXPIRED)
+const KEEP_EXPIRED_DAYS = 30
 
 /** When a token stops working: amber in its last week, red once it has. */
 function Expiry({ expiresAt }: { expiresAt: string }) {
@@ -369,7 +371,8 @@ function Expiry({ expiresAt }: { expiresAt: string }) {
   if (left <= 0) {
     return (
       <p className="text-xs font-medium text-red-600 dark:text-red-400">
-        Expired {when}. Revoke it, and create a new one if you still need it.
+        Expired {when}. Create a new one if you still need it; this one goes from the list{" "}
+        {KEEP_EXPIRED_DAYS} days after it expired.
       </p>
     )
   }

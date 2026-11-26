@@ -20,6 +20,7 @@ from app.core.logs import setup_logging as configure_logging
 from app.core.monitoring import init_sentry
 from app.demo_data import refresh
 from app.services import jobs
+from app.services.api_tokens import purge_expired_tokens
 from app.services.daily import claim_daily_run
 from app.services.rotting import check_rotting
 from app.services.trash import purge_expired
@@ -83,10 +84,11 @@ def check_rotting_job(session: Session) -> dict[str, object]:
 
 
 def purge_trash_job(session: Session) -> dict[str, object]:
-    """Delete for good what has been in the trash longer than TRASH_DAYS, and old job
-    records."""
+    """Delete for good what has been in the trash longer than TRASH_DAYS, old job records, and
+    access tokens that expired a while ago (KEEP_EXPIRED)."""
     purged: dict[str, object] = dict(purge_expired(session))
     purged["job_runs"] = jobs.prune(session)
+    purged["expired_tokens"] = purge_expired_tokens(session)
     return purged
 
 

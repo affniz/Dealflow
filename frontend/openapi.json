@@ -571,7 +571,7 @@
           "tokens"
         ],
         "summary": "List Tokens",
-        "description": "Your personal access tokens (never the tokens themselves), expired ones included until\nyou revoke them.",
+        "description": "Your personal access tokens (never the tokens themselves). An expired one stays listed\nfor 30 days after it expires, unless you revoke it first.",
         "operationId": "tokens-list_tokens",
         "responses": {
           "200": {
