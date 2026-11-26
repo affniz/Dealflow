@@ -35,10 +35,15 @@ test("connect Claude: create a token, use it over MCP, revoke it", async ({ page
   await page.getByRole("button", { name: "Create token" }).click()
   const dialog = page.getByRole("dialog", { name: "Create a token" })
   await dialog.getByLabel("Name").fill("e2e")
+  await expect(dialog.getByRole("radio", { name: /Read only/ })).toBeChecked()
+  await expect(dialog.getByLabel("Expires")).toHaveValue("90")
   await dialog.getByRole("button", { name: "Create token" }).click()
   const token = (await page.getByLabel("Token", { exact: true }).innerText()).trim()
   expect(token).toMatch(/^dfp_/)
   await page.getByRole("button", { name: "Done" }).click()
+  const row = page.getByRole("listitem").filter({ hasText: "e2e" })
+  await expect(row).toContainText("Read only")
+  await expect(row).toContainText("Expires in 3 months")
 
   const call = (t: string) =>
     page.request.post("/mcp", {
@@ -50,7 +55,9 @@ test("connect Claude: create a token, use it over MCP, revoke it", async ({ page
     })
   const listed = await call(token)
   expect(listed.status()).toBe(200)
-  expect(JSON.stringify(await listed.json())).toContain("search_deals")
+  const tools = JSON.stringify(await listed.json())
+  expect(tools).toContain("search_deals")
+  expect(tools).not.toContain("propose_") // a read-only token isn't offered changes
 
   await page.getByRole("button", { name: "Revoke" }).click()
   await page.getByRole("button", { name: "Revoke token" }).click()

@@ -97,6 +97,10 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - Create and revoke tokens under **Your account**, which also prints the `claude mcp add`
   command. Only a SHA-256 hash of each token is stored, and a deactivated person's tokens stop
   working at once
+- Each token is **read only** (search and look things up; the default) or can **suggest
+  changes** (the proposal tools too, still approved in the inbox), and **expires** after 30 days,
+  90 days (the default) or a year. Read-only tokens aren't offered the proposal tools at all.
+  The account page flags a token in its last week and once it has expired
 
 **Pipeline agent (AI)**
 - Every morning (07:00 in the team's time zone) it reviews each stalled deal as the deal's owner:
@@ -188,6 +192,7 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 ### Connect Claude to Dealflow (MCP)
 
 1. In Dealflow, open **Your account** (your name at the bottom of the sidebar) and create a token.
+   Choose **Read and suggest changes** if you want Claude to prepare changes for you to approve.
 2. Run the command it shows, for example:
 
    ```bash
@@ -484,8 +489,9 @@ them, and every Monday for advisories published since. To run it locally:
   forge to point a victim's link at their own site.
 - **One set of tools, three ways in.** The Copilot, the pipeline agent and the MCP server share
   the same twelve tools, so Claude Code or Claude Desktop gets the same abilities and limits as
-  the in-app Copilot. MCP uses personal access tokens (stored hashed, revocable) rather than
-  OAuth: simpler for a team tool, and enough until there's a need for third-party apps.
+  the in-app Copilot. MCP uses personal access tokens (stored hashed, revocable, expiring, read
+  only unless asked) rather than OAuth: simpler for a team tool, and enough until there's a need
+  for third-party apps.
 - **Cache-friendly by construction.** Conversation history is append-only and the system
   prompt never changes inside a chat (new prompt versions apply to new chats), so prompt
   caching keeps working and long chats stay cheap.

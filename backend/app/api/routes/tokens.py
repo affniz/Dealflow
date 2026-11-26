@@ -1,10 +1,19 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func
 from sqlmodel import col, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.security import generate_api_token, hash_api_token
-from app.models import ApiToken, ApiTokenCreate, ApiTokenCreated, ApiTokenPublic, Message
+from app.models import (
+    ApiToken,
+    ApiTokenCreate,
+    ApiTokenCreated,
+    ApiTokenPublic,
+    Message,
+    utcnow,
+)
 
 router = APIRouter(prefix="/users/me/tokens", tags=["tokens"])
 
@@ -13,17 +22,21 @@ MAX_TOKENS = 20
 
 @router.get("", response_model=list[ApiTokenPublic])
 def list_tokens(session: SessionDep, user: CurrentUser) -> list[ApiToken]:
-    """Your personal access tokens (never the tokens themselves)."""
+    """Your personal access tokens (never the tokens themselves), expired ones included until
+    you revoke them."""
     stmt = select(ApiToken).where(ApiToken.user_id == user.id)
     return list(session.exec(stmt.order_by(col(ApiToken.created_at).desc())).all())
 
 
 @router.post("", response_model=ApiTokenCreated, status_code=status.HTTP_201_CREATED)
 def create_token(session: SessionDep, user: CurrentUser, body: ApiTokenCreate) -> ApiTokenCreated:
-    """A new token that acts as you, with your role and access. It's shown only in this
-    response."""
-    count = session.exec(
-        select(func.count()).select_from(ApiToken).where(ApiToken.user_id == user.id)
+    """A new token that acts as you, with your role and access, narrowed by its scope, until it
+    expires. It's shown only in this response."""
+    now = utcnow()
+    count = session.exec(  # expired tokens don't count
+        select(func.count())
+        .select_from(ApiToken)
+        .where(ApiToken.user_id == user.id, col(ApiToken.expires_at) > now)
     ).one()
     if count >= MAX_TOKENS:
         raise HTTPException(
@@ -35,6 +48,9 @@ def create_token(session: SessionDep, user: CurrentUser, body: ApiTokenCreate) -
         name=body.name.strip(),
         token_hash=hash_api_token(token),
         prefix=token[:10],
+        scope=body.scope,
+        created_at=now,
+        expires_at=now + timedelta(days=body.expires_in_days),
     )
     session.add(row)
     session.commit()
