@@ -22,7 +22,7 @@ const token = (over: Partial<ApiTokenPublic>): ApiTokenPublic => ({
   ...over,
 })
 
-function renderPage(tokens: ApiTokenPublic[]) {
+function renderPage(tokens: ApiTokenPublic[], user: UserPublic = ARJUN) {
   const created: ApiTokenCreated = {
     ...token({ id: 9, name: "Laptop", expires_at: inDays(30) }),
     token: "dfp_secret",
@@ -33,7 +33,7 @@ function renderPage(tokens: ApiTokenPublic[]) {
     "POST /api/v1/users/me/tokens": { status: 201, json: created },
   })
   const auth = {
-    user: ARJUN,
+    user,
     isLoading: false,
     isAuthenticated: true,
     login: async () => {},
@@ -64,7 +64,7 @@ describe("Connect Claude", () => {
     // its last week: picked out in amber
     expect(within(helper).getByText("in 3 days").parentElement).toHaveClass("text-amber-700")
     expect(await row("Old laptop")).toHaveTextContent(
-      "Expired 2 days ago. Revoke it, and create a new one if you still need it.",
+      "Expired 2 days ago. Create a new one if you still need it; this one goes from the list 30 days after it expired.",
     )
   })
 
@@ -84,5 +84,14 @@ describe("Connect Claude", () => {
     )
     const sent = api.calls.find((c) => c.method === "POST")!
     expect(sent.body).toEqual({ name: "Claude Code", scope: "suggest", expires_in_days: 30 })
+  })
+
+  it("doesn't offer viewers a token that suggests changes", async () => {
+    const { user } = renderPage([], { ...ARJUN, role: "viewer" })
+    await user.click(await screen.findByRole("button", { name: "Create token" }))
+    const dialog = screen.getByRole("dialog", { name: "Create a token" })
+    expect(within(dialog).getByRole("radio", { name: /Read only/ })).toBeChecked()
+    expect(within(dialog).getByRole("radio", { name: /Read and suggest changes/ })).toBeDisabled()
+    expect(dialog).toHaveTextContent("Viewers can't suggest changes.")
   })
 })

@@ -240,7 +240,7 @@ class LoginFailure(SQLModel, table=True):
 # "read": search and look things up. "suggest": that, and propose changes for the person to
 # approve. Neither changes anything directly: every change goes through the Agent inbox.
 TokenScope = Literal["read", "suggest"]
-TOKEN_LIFETIMES_DAYS = (30, 90, 365)
+TokenLifetimeDays = Literal[30, 90, 365]
 
 
 class ApiTokenCreate(SQLModel):
@@ -248,9 +248,17 @@ class ApiTokenCreate(SQLModel):
     scope: TokenScope = PydField(
         default="read", description="read: look things up; suggest: also propose changes"
     )
-    expires_in_days: Literal[30, 90, 365] = PydField(
+    expires_in_days: TokenLifetimeDays = PydField(
         default=90, description="How long the token works for"
     )
+
+    @field_validator("name")
+    @classmethod
+    def _named(cls, value: str) -> str:
+        # "   " passes min_length, and would be saved as a token with no name
+        if not value.strip():
+            raise ValueError("Give the token a name")
+        return value.strip()
 
 
 class ApiTokenPublic(SQLModel):

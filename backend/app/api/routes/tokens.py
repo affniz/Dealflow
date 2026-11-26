@@ -22,8 +22,8 @@ MAX_TOKENS = 20
 
 @router.get("", response_model=list[ApiTokenPublic])
 def list_tokens(session: SessionDep, user: CurrentUser) -> list[ApiToken]:
-    """Your personal access tokens (never the tokens themselves), expired ones included until
-    you revoke them."""
+    """Your personal access tokens (never the tokens themselves). An expired one stays listed
+    for 30 days after it expires, unless you revoke it first."""
     stmt = select(ApiToken).where(ApiToken.user_id == user.id)
     return list(session.exec(stmt.order_by(col(ApiToken.created_at).desc())).all())
 
@@ -45,7 +45,7 @@ def create_token(session: SessionDep, user: CurrentUser, body: ApiTokenCreate) -
     token = generate_api_token()
     row = ApiToken(
         user_id=user.id,  # type: ignore[arg-type]
-        name=body.name.strip(),
+        name=body.name,  # stripped by ApiTokenCreate
         token_hash=hash_api_token(token),
         prefix=token[:10],
         scope=body.scope,

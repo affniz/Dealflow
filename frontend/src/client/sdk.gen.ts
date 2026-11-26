@@ -191,8 +191,8 @@ export const usersMakePasswordResetLink = <ThrowOnError extends boolean = false>
 /**
  * List Tokens
  *
- * Your personal access tokens (never the tokens themselves), expired ones included until
- * you revoke them.
+ * Your personal access tokens (never the tokens themselves). An expired one stays listed
+ * for 30 days after it expires, unless you revoke it first.
  */
 export const tokensListTokens = <ThrowOnError extends boolean = false>(options?: Options<TokensListTokensData, ThrowOnError>): RequestResult<TokensListTokensResponses, unknown, ThrowOnError> => (options?.client ?? client).get<TokensListTokensResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

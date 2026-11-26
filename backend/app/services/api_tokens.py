@@ -6,15 +6,19 @@ propose changes, which still wait in the owner's Agent inbox for their approval.
 """
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, delete, select
 
 from app.core.security import API_TOKEN_PREFIX, hash_api_token
-from app.models import ApiToken, User, utcnow
+from app.core.time import local
+from app.models import ApiToken, Role, User, utcnow
 
 # don't write to the database on every call just to bump "last used"
 _TOUCH_EVERY = timedelta(minutes=5)
+# An expired token stays listed (and its 401 says when it expired) for this long, so people can
+# see why Claude stopped working; then the worker's hourly cleanup deletes it.
+KEEP_EXPIRED = timedelta(days=30)
 
 NO_TOKEN = (
     "Send a Dealflow personal access token as 'Authorization: Bearer dfp_…'. "
@@ -33,7 +37,9 @@ class TokenAccess:
 
     @property
     def can_suggest(self) -> bool:
-        return self.scope == "suggest"
+        """Whether the proposal tools are any use: the token allows them, and so does the
+        person's role (a viewer's "suggest" token still can't propose)."""
+        return self.scope == "suggest" and self.user.role != Role.viewer
 
 
 def token_access(session: Session, token: str | None) -> TokenAccess:
@@ -46,7 +52,7 @@ def token_access(session: Session, token: str | None) -> TokenAccess:
     now = utcnow()
     if row.expires_at <= now:
         raise TokenRefused(
-            f"This access token expired on {row.expires_at:%d %b %Y}. "
+            f"This access token expired on {local(row.expires_at):%d %b %Y}. "
             "Create a new one in Dealflow under Your account."
         )
     user = session.get(User, row.user_id)
@@ -57,6 +63,14 @@ def token_access(session: Session, token: str | None) -> TokenAccess:
         session.add(row)
         session.commit()
     return TokenAccess(user=user, scope=row.scope)
+
+
+def purge_expired_tokens(session: Session, now: datetime | None = None) -> int:
+    """Delete tokens that expired more than KEEP_EXPIRED ago, anyone's. Commits."""
+    cutoff = (now or utcnow()) - KEEP_EXPIRED
+    deleted = session.exec(delete(ApiToken).where(col(ApiToken.expires_at) <= cutoff))
+    session.commit()
+    return deleted.rowcount or 0
 
 
 def bearer(authorization: str | None) -> str | None:

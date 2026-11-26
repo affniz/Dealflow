@@ -1,11 +1,14 @@
 """Personal access tokens and the MCP server at /mcp."""
 
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import anyio
 from sqlmodel import select
 
+from app.core.config import settings
+from app.mcp_server import server
 from app.models import ApiToken, Role, utcnow
 from tests.conftest import API
 
@@ -161,6 +164,9 @@ def test_viewer_can_read_but_not_propose(client, login, stages):
         client, token, "search_deals", status="open", stalled_only=False, mine_only=False, limit=5
     )
     assert not err and len(out["deals"]) == 1
+    # not offered the proposal tools, and refused if it calls one anyway
+    tools = {t["name"] for t in _rpc(client, token, "tools/list").json()["result"]["tools"]}
+    assert "search_deals" in tools and not {t for t in tools if t.startswith("propose_")}
     err, text = _call(client, token, "propose_mark_won", deal_id=deal_id, reason="Signed")
     assert err and "viewer" in text
 
@@ -193,6 +199,14 @@ def test_new_tokens_read_only_for_ninety_days_unless_asked(client, login):
         assert r.status_code == 422, bad
 
 
+def test_token_names_are_trimmed_and_cant_be_blank(client, login):
+    h = login(Role.agent)
+    _token(client, h, "  Laptop  ")
+    assert [t["name"] for t in client.get(f"{API}/users/me/tokens", headers=h).json()] == ["Laptop"]
+    r = client.post(f"{API}/users/me/tokens", headers=h, json={"name": "   "})
+    assert r.status_code == 422
+
+
 def test_read_only_tokens_arent_offered_or_allowed_to_propose(client, login, stages):
     h = login(Role.agent)
     deal_id = _deal(client, h, stages[0])
@@ -210,7 +224,7 @@ def test_read_only_tokens_arent_offered_or_allowed_to_propose(client, login, sta
     assert client.get(f"{API}/proposals", headers=h, params={"status": "pending"}).json() == []
 
 
-def test_expired_tokens_stop_working_and_say_so(client, login, session):
+def test_expired_tokens_stop_working_and_say_so(client, login, session, monkeypatch):
     h = login(Role.agent)
     token = _token(client, h)
     assert _rpc(client, token, "tools/list").status_code == 200
@@ -223,6 +237,12 @@ def test_expired_tokens_stop_working_and_say_so(client, login, session):
     r = _rpc(client, token, "tools/list")
     assert r.status_code == 401
     assert r.json()["detail"].startswith("This access token expired on ")
+    # the date is the team's: 20:00 UTC on 1 Jan is already 2 Jan in India
+    monkeypatch.setattr(settings, "TIMEZONE", "Asia/Kolkata")
+    row.expires_at = datetime(2026, 1, 1, 20, 0, tzinfo=UTC)
+    session.add(row)
+    session.commit()
+    assert "expired on 02 Jan 2026" in _rpc(client, token, "tools/list").json()["detail"]
     # still listed, so the person can see what happened and revoke it
     [listed] = client.get(f"{API}/users/me/tokens", headers=h).json()
     assert datetime.fromisoformat(listed["expires_at"]) < utcnow()
@@ -243,3 +263,29 @@ def test_expired_tokens_dont_count_toward_the_limit(client, login, session, monk
     session.add(old)
     session.commit()
     _token(client, h, "Three")
+
+
+def test_only_a_request_with_a_suggest_token_is_offered_proposals():
+    # outside a request that came through the token check, the server offers the read tools only
+    tools = {t.name for t in anyio.run(server.list_tools)}
+    assert "search_deals" in tools
+    assert not {t for t in tools if t.startswith("propose_")}
+
+
+def test_hourly_cleanup_deletes_tokens_a_month_after_they_expire(client, login, session):
+    from app.worker import purge_trash_job
+
+    h = login(Role.agent)
+    for name in ("Live", "Lately", "Long gone"):
+        _token(client, h, name)
+    now = utcnow()
+    expired = {"Lately": now - timedelta(days=29), "Long gone": now - timedelta(days=31)}
+    for row in session.exec(select(ApiToken)).all():
+        if row.name in expired:
+            row.expires_at = expired[row.name]
+            session.add(row)
+    session.commit()
+
+    assert purge_trash_job(session)["expired_tokens"] == 1
+    listed = {t["name"] for t in client.get(f"{API}/users/me/tokens", headers=h).json()}
+    assert listed == {"Live", "Lately"}

@@ -100,7 +100,8 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
 - Each token is **read only** (search and look things up; the default) or can **suggest
   changes** (the proposal tools too, still approved in the inbox), and **expires** after 30 days,
   90 days (the default) or a year. Read-only tokens aren't offered the proposal tools at all.
-  The account page flags a token in its last week and once it has expired
+  The account page flags a token in its last week and once it has expired; 30 days after
+  that, the hourly cleanup deletes it
 
 **Pipeline agent (AI)**
 - Every morning (07:00 in the team's time zone) it reviews each stalled deal as the deal's owner:

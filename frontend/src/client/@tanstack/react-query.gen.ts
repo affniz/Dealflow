@@ -308,8 +308,8 @@ export const tokensListTokensQueryKey = (options?: Options<TokensListTokensData>
 /**
  * List Tokens
  *
- * Your personal access tokens (never the tokens themselves), expired ones included until
- * you revoke them.
+ * Your personal access tokens (never the tokens themselves). An expired one stays listed
+ * for 30 days after it expires, unless you revoke it first.
  */
 export const tokensListTokensOptions = (options?: Options<TokensListTokensData>) => queryOptions<TokensListTokensResponse, DefaultError, TokensListTokensResponse, ReturnType<typeof tokensListTokensQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
