@@ -7,7 +7,8 @@ access token is in the Authorization header. That means the same rules hold ever
   the team's companies and contacts).
 - Change tools never change anything. They create a proposal that the person approves or
   rejects in Dealflow's Agent inbox, exactly like the Copilot's and the pipeline agent's.
-- Viewers can read but not propose.
+- Viewers, and read-only tokens, can read but not propose; neither is offered the propose_*
+  tools.
 """
 
 import inspect
@@ -54,17 +55,19 @@ READ_ONLY_REFUSAL = (
 )
 PROPOSING = {t.name for t in TOOLS if t.proposes_change}
 
-# the scope of the token on the request being handled, set by _Authenticated below
-_scope: ContextVar[str | None] = ContextVar("token_scope", default=None)
+# whether the token on the request being handled may propose changes, set by _Authenticated
+# below; anything that didn't come through it is offered only the read tools
+_can_suggest: ContextVar[bool] = ContextVar("token_can_suggest", default=False)
 
 
 class _Server(MCPServer):
     async def list_tools(self) -> list[MCPTool]:
-        """A read-only token isn't offered the tools that propose changes."""
+        """A token that can't propose changes (read only, or a viewer's) isn't offered the tools
+        that do."""
         tools = await super().list_tools()
-        if _scope.get() == "read":
-            return [t for t in tools if t.name not in PROPOSING]
-        return tools
+        if _can_suggest.get():
+            return tools
+        return [t for t in tools if t.name not in PROPOSING]
 
 
 server = _Server(name="Dealflow", title="Dealflow CRM", instructions=INSTRUCTIONS)
@@ -93,8 +96,9 @@ def _call(tool: Tool, ctx: Context, args: dict[str, Any]) -> str:
             access = token_access(session, token)
         except TokenRefused as e:
             raise MCPToolError(str(e)) from None
-        if tool.proposes_change and not access.can_suggest:
+        if tool.proposes_change and access.scope != "suggest":
             raise MCPToolError(READ_ONLY_REFUSAL)
+        # a viewer's "suggest" token gets the tool's own answer: viewers can't change anything
         user = access.user
         inp = tool.input_model.model_validate(args)
         try:
@@ -167,11 +171,11 @@ async def running() -> AsyncIterator[None]:
         yield
 
 
-def _check_token(scope: Scope) -> str:
-    """The scope of the request's token; raises TokenRefused."""
+def _check_token(scope: Scope) -> bool:
+    """Whether the request's token may propose changes; raises TokenRefused."""
     headers = {k.decode().lower(): v.decode() for k, v in scope["headers"]}
     with _session() as session:
-        return token_access(session, bearer(headers.get("authorization"))).scope
+        return token_access(session, bearer(headers.get("authorization"))).can_suggest
 
 
 class _Authenticated:
@@ -180,13 +184,13 @@ class _Authenticated:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http":
             try:
-                token_scope = await anyio.to_thread.run_sync(_check_token, scope)
+                can_suggest = await anyio.to_thread.run_sync(_check_token, scope)
             except TokenRefused as e:
                 response = JSONResponse(
                     {"detail": str(e)}, status_code=401, headers={"WWW-Authenticate": "Bearer"}
                 )
                 return await response(scope, receive, send)
-            _scope.set(token_scope)
+            _can_suggest.set(can_suggest)
         await server.session_manager.handle_request(scope, receive, send)
 
 

@@ -11,7 +11,8 @@ from datetime import timedelta
 from sqlmodel import Session, select
 
 from app.core.security import API_TOKEN_PREFIX, hash_api_token
-from app.models import ApiToken, User, utcnow
+from app.core.time import local
+from app.models import ApiToken, Role, User, utcnow
 
 # don't write to the database on every call just to bump "last used"
 _TOUCH_EVERY = timedelta(minutes=5)
@@ -33,7 +34,9 @@ class TokenAccess:
 
     @property
     def can_suggest(self) -> bool:
-        return self.scope == "suggest"
+        """Whether the proposal tools are any use: the token allows them, and so does the
+        person's role (a viewer's "suggest" token still can't propose)."""
+        return self.scope == "suggest" and self.user.role != Role.viewer
 
 
 def token_access(session: Session, token: str | None) -> TokenAccess:
@@ -46,7 +49,7 @@ def token_access(session: Session, token: str | None) -> TokenAccess:
     now = utcnow()
     if row.expires_at <= now:
         raise TokenRefused(
-            f"This access token expired on {row.expires_at:%d %b %Y}. "
+            f"This access token expired on {local(row.expires_at):%d %b %Y}. "
             "Create a new one in Dealflow under Your account."
         )
     user = session.get(User, row.user_id)

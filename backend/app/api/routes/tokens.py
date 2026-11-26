@@ -45,7 +45,7 @@ def create_token(session: SessionDep, user: CurrentUser, body: ApiTokenCreate) -
     token = generate_api_token()
     row = ApiToken(
         user_id=user.id,  # type: ignore[arg-type]
-        name=body.name.strip(),
+        name=body.name,  # stripped by ApiTokenCreate
         token_hash=hash_api_token(token),
         prefix=token[:10],
         scope=body.scope,

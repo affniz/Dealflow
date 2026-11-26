@@ -397,6 +397,7 @@ function NewTokenDialog({
   onCreated: (t: ApiTokenCreated) => void
 }) {
   const queryClient = useQueryClient()
+  const viewer = useAuth().user?.role === "viewer"
   const [name, setName] = useState("Claude Code")
   const [scope, setScope] = useState<Scope>("read")
   const [days, setDays] = useState<Lifetime>(90)
@@ -439,27 +440,37 @@ function NewTokenDialog({
         </Field>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-ink">Access</legend>
-          {(Object.keys(SCOPES) as Scope[]).map((s) => (
-            <label
-              key={s}
-              className={cn(
-                "flex cursor-pointer gap-3 rounded-md border p-3 text-sm transition-colors",
-                scope === s ? "border-brand-600 bg-brand-50" : "border-line hover:bg-muted",
-              )}
-            >
-              <input
-                type="radio"
-                name="token-scope"
-                className="mt-0.5 accent-brand-600"
-                checked={scope === s}
-                onChange={() => setScope(s)}
-              />
-              <span>
-                <span className="block font-medium">{SCOPES[s].label}</span>
-                <span className="block text-xs text-ink-soft">{SCOPES[s].hint}</span>
-              </span>
-            </label>
-          ))}
+          {(Object.keys(SCOPES) as Scope[]).map((s) => {
+            // the API would make one, but a viewer's token can't propose whatever it allows
+            const off = s === "suggest" && viewer
+            return (
+              <label
+                key={s}
+                className={cn(
+                  "flex gap-3 rounded-md border p-3 text-sm transition-colors",
+                  off ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                  scope === s
+                    ? "border-brand-600 bg-brand-50"
+                    : cn("border-line", !off && "hover:bg-muted"),
+                )}
+              >
+                <input
+                  type="radio"
+                  name="token-scope"
+                  className="mt-0.5 accent-brand-600"
+                  checked={scope === s}
+                  disabled={off}
+                  onChange={() => setScope(s)}
+                />
+                <span>
+                  <span className="block font-medium">{SCOPES[s].label}</span>
+                  <span className="block text-xs text-ink-soft">
+                    {off ? "Viewers can't suggest changes." : SCOPES[s].hint}
+                  </span>
+                </span>
+              </label>
+            )
+          })}
         </fieldset>
         <Field label="Expires" htmlFor="token-expires">
           <Select
@@ -526,7 +537,7 @@ function TokenCreatedDialog({
             </p>
             <p className="mt-2 flex items-center gap-2">
               <Badge>Tip</Badge> Treat it like a password. Anyone with it can read what you can
-              until it expires.
+              {token.scope === "suggest" && " and suggest changes"} until it expires.
             </p>
           </div>
           <DialogFooter>
