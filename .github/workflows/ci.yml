@@ -14,7 +14,8 @@ permissions:
   contents: read
 
 env:
-  # the AI agents stay off in CI, whatever credentials happen to be around
+  # CI never calls Claude, whatever credentials happen to be around: the agents are off, and the
+  # end-to-end API (scripts/e2e_server.sh) runs the Copilot with a scripted stand-in instead
   AI_ENABLED: "false"
   SECRET_KEY: ci-only-secret-not-used-anywhere-else
 
