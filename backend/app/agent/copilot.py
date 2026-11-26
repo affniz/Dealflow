@@ -90,6 +90,10 @@ def get_client() -> MessagesClient | None:
 
     if not settings.AI_ENABLED:
         return None
+    if settings.AI_SCRIPTED:
+        from app.agent.scripted import ScriptedClaude
+
+        return ScriptedClaude()
     # a call that hangs must end well inside a Copilot turn's time limit (turns.TURN_TIMEOUT)
     timeout, retries = settings.CLAUDE_TIMEOUT_SECONDS, 2
     if settings.ANTHROPIC_API_KEY:

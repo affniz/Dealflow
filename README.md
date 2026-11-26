@@ -411,8 +411,12 @@ screens, sign-in and session expiry, and the System status tab. They run in a fe
 
 End-to-end tests (Playwright) drive the real app in Chromium: signing in, the board (including
 drag and drop), deals won and lost, contacts, activities, role access, the dashboard, settings,
-and connecting Claude over MCP. They start their own API and front end on ports 8010 and 5174,
-on a `dealflow_e2e` database that is reset to the demo data on every run, with AI turned off:
+connecting Claude over MCP, and the Copilot: answers, live steps, approving and rejecting its
+suggestions, a viewer's limits, and what happens when Claude can't be reached. They start their
+own API and front end on ports 8010 and 5174, on a `dealflow_e2e` database that is reset to the
+demo data on every run. The Copilot there runs with a scripted stand-in for Claude
+(`backend/app/agent/scripted.py`, turned on by `AI_SCRIPTED`, refused in production): it calls the
+real tools and answers from what they return, so only the model's judgement is replaced.
 
 ```bash
 cd frontend
@@ -423,7 +427,8 @@ npm run e2e
 **CI** (`.github/workflows/ci.yml`) runs on every pull request and push to `main`: backend lint,
 migrations applied and checked against the models, the test suite on Postgres, a check that the
 generated API schema and client are up to date, front-end formatting, lint, unit tests and
-build, and the end-to-end tests. CI sets `AI_ENABLED=false`, so it never calls Claude.
+build, and the end-to-end tests. CI never calls Claude: it sets `AI_ENABLED=false`, and the
+end-to-end tests use the scripted stand-in.
 
 **Dependency audit** (`.github/workflows/audit.yml`) checks the locked Python and npm packages
 against published security advisories (`uv audit` and `npm audit`) when a pull request changes

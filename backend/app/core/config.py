@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str | None = None
     # False turns the AI agents off even if credentials are around (end-to-end tests, CI)
     AI_ENABLED: bool = True
+    # A scripted stand-in for Claude (app.agent.scripted), for the end-to-end tests: the Copilot
+    # works without an API key and never calls Claude. Refused in production.
+    AI_SCRIPTED: bool = False
     # Defaults for each agent; admins can change them in Settings (stored in the database).
     COPILOT_MODEL: str = "claude-sonnet-5-5"
     COPILOT_EFFORT: Effort = "medium"
@@ -142,6 +145,8 @@ class Settings(BaseSettings):
                 raise ValueError("Set SECRET_KEY before running in production")
             if self.FIRST_OWNER_PASSWORD == DEV_OWNER_PASSWORD:
                 raise ValueError("Set FIRST_OWNER_PASSWORD before running in production")
+            if self.AI_SCRIPTED:
+                raise ValueError("AI_SCRIPTED is for tests: turn it off in production")
         return self
 
 
