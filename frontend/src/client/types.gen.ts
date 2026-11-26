@@ -339,6 +339,18 @@ export type ApiTokenCreate = {
      * Name
      */
     name: string;
+    /**
+     * Scope
+     *
+     * read: look things up; suggest: also propose changes
+     */
+    scope?: 'read' | 'suggest';
+    /**
+     * Expires In Days
+     *
+     * How long the token works for
+     */
+    expires_in_days?: 30 | 90 | 365;
 };
 
 /**
@@ -358,9 +370,17 @@ export type ApiTokenCreated = {
      */
     prefix: string;
     /**
+     * Scope
+     */
+    scope: 'read' | 'suggest';
+    /**
      * Created At
      */
     created_at: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
     /**
      * Last Used At
      */
@@ -390,9 +410,17 @@ export type ApiTokenPublic = {
      */
     prefix: string;
     /**
+     * Scope
+     */
+    scope: 'read' | 'suggest';
+    /**
      * Created At
      */
     created_at: string;
+    /**
+     * Expires At
+     */
+    expires_at: string;
     /**
      * Last Used At
      */

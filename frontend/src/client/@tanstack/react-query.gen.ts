@@ -308,7 +308,8 @@ export const tokensListTokensQueryKey = (options?: Options<TokensListTokensData>
 /**
  * List Tokens
  *
- * Your personal access tokens (never the tokens themselves).
+ * Your personal access tokens (never the tokens themselves), expired ones included until
+ * you revoke them.
  */
 export const tokensListTokensOptions = (options?: Options<TokensListTokensData>) => queryOptions<TokensListTokensResponse, DefaultError, TokensListTokensResponse, ReturnType<typeof tokensListTokensQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -326,8 +327,8 @@ export const tokensListTokensOptions = (options?: Options<TokensListTokensData>)
 /**
  * Create Token
  *
- * A new token that acts as you, with your role and access. It's shown only in this
- * response.
+ * A new token that acts as you, with your role and access, narrowed by its scope, until it
+ * expires. It's shown only in this response.
  */
 export const tokensCreateTokenMutation = (options?: Partial<Options<TokensCreateTokenData>>): UseMutationOptions<TokensCreateTokenResponse, TokensCreateTokenError, Options<TokensCreateTokenData>> => {
     const mutationOptions: UseMutationOptions<TokensCreateTokenResponse, TokensCreateTokenError, Options<TokensCreateTokenData>> = {

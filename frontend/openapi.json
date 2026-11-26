@@ -571,7 +571,7 @@
           "tokens"
         ],
         "summary": "List Tokens",
-        "description": "Your personal access tokens (never the tokens themselves).",
+        "description": "Your personal access tokens (never the tokens themselves), expired ones included until\nyou revoke them.",
         "operationId": "tokens-list_tokens",
         "responses": {
           "200": {
@@ -600,7 +600,7 @@
           "tokens"
         ],
         "summary": "Create Token",
-        "description": "A new token that acts as you, with your role and access. It's shown only in this\nresponse.",
+        "description": "A new token that acts as you, with your role and access, narrowed by its scope, until it\nexpires. It's shown only in this response.",
         "operationId": "tokens-create_token",
         "requestBody": {
           "content": {
@@ -4973,6 +4973,27 @@
             "maxLength": 100,
             "minLength": 1,
             "title": "Name"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "read",
+              "suggest"
+            ],
+            "title": "Scope",
+            "description": "read: look things up; suggest: also propose changes",
+            "default": "read"
+          },
+          "expires_in_days": {
+            "type": "integer",
+            "enum": [
+              30,
+              90,
+              365
+            ],
+            "title": "Expires In Days",
+            "description": "How long the token works for",
+            "default": 90
           }
         },
         "type": "object",
@@ -4995,10 +5016,23 @@
             "type": "string",
             "title": "Prefix"
           },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "read",
+              "suggest"
+            ],
+            "title": "Scope"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
           },
           "last_used_at": {
             "anyOf": [
@@ -5023,7 +5057,9 @@
           "id",
           "name",
           "prefix",
+          "scope",
           "created_at",
+          "expires_at",
           "last_used_at",
           "token"
         ],
@@ -5043,10 +5079,23 @@
             "type": "string",
             "title": "Prefix"
           },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "read",
+              "suggest"
+            ],
+            "title": "Scope"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
           },
           "last_used_at": {
             "anyOf": [
@@ -5066,7 +5115,9 @@
           "id",
           "name",
           "prefix",
+          "scope",
           "created_at",
+          "expires_at",
           "last_used_at"
         ],
         "title": "ApiTokenPublic"

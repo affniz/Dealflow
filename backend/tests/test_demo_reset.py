@@ -39,7 +39,16 @@ def test_reset_puts_the_demo_back_and_keeps_people_and_spending(session):
     chat = AgentConversation(user_id=arjun_id, title="Hi")  # type: ignore[arg-type]
     session.add(chat)
     session.flush()
-    session.add(ApiToken(user_id=arjun_id, name="t", token_hash="h" * 64, prefix="df_x"))  # type: ignore[arg-type]
+    session.add(
+        ApiToken(
+            user_id=arjun_id,  # type: ignore[arg-type]
+            name="t",
+            token_hash="h" * 64,
+            prefix="df_x",
+            scope="read",
+            expires_at=datetime.now(UTC) + timedelta(days=90),
+        )
+    )
     session.add(
         AIUsage(
             feature="copilot",

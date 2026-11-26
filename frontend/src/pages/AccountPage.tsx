@@ -12,20 +12,20 @@ import {
   usersReadMeOptions,
   usersUpdateMeMutation,
 } from "@/client/@tanstack/react-query.gen"
-import type { ApiTokenCreated, ApiTokenPublic } from "@/client/types.gen"
+import type { ApiTokenCreate, ApiTokenCreated, ApiTokenPublic } from "@/client/types.gen"
 import { PageHeader } from "@/components/layout/AppLayout"
 import { Button } from "@/components/ui/button"
 import { Badge, Card, Spinner } from "@/components/ui/card"
 import { CopyBlock } from "@/components/ui/copy"
 import { ConfirmDialog } from "@/components/ui/confirm"
 import { Dialog, DialogFooter } from "@/components/ui/dialog"
-import { Field } from "@/components/ui/field"
+import { Field, Select } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { apiErrorMessage, invalidate } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { formatDateTime } from "@/lib/time"
+import { formatDateTime, useNow } from "@/lib/time"
 import { useToast } from "@/lib/toast"
-import { timeAgo } from "@/lib/utils"
+import { cn, timeAgo } from "@/lib/utils"
 
 /** The signed-in person's own settings: name, password, and tokens for connecting Claude. */
 export function AccountPage() {
@@ -276,7 +276,12 @@ function ConnectClaude() {
               <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <KeyRound className="size-4 shrink-0 text-ink-faint" aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{t.name}</p>
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <span className="truncate">{t.name}</span>
+                    <Badge tone={t.scope === "suggest" ? "brand" : "neutral"}>
+                      {SCOPES[t.scope].short}
+                    </Badge>
+                  </p>
                   <p className="text-xs text-ink-soft">
                     <span className="font-mono">{t.prefix}…</span> · created{" "}
                     <time dateTime={t.created_at} title={formatDateTime(t.created_at)}>
@@ -294,6 +299,7 @@ function ConnectClaude() {
                       "never used"
                     )}
                   </p>
+                  <Expiry expiresAt={t.expires_at} />
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setRevoking(t)}>
                   Revoke
@@ -333,6 +339,54 @@ function ConnectClaude() {
   )
 }
 
+type Scope = ApiTokenCreate["scope"] & string
+type Lifetime = NonNullable<ApiTokenCreate["expires_in_days"]>
+
+const SCOPES: Record<Scope, { label: string; short: string; hint: string }> = {
+  read: {
+    label: "Read only",
+    short: "Read only",
+    hint: "Claude can search and look things up, but can't suggest changes.",
+  },
+  suggest: {
+    label: "Read and suggest changes",
+    short: "Can suggest",
+    hint: "Claude can also prepare changes. Each one waits in your Agent inbox for you to approve.",
+  },
+}
+
+const EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000
+
+/** When a token stops working: amber in its last week, red once it has. */
+function Expiry({ expiresAt }: { expiresAt: string }) {
+  const now = useNow()
+  const left = new Date(expiresAt).getTime() - now
+  const when = (
+    <time dateTime={expiresAt} title={formatDateTime(expiresAt)}>
+      {timeAgo(expiresAt)}
+    </time>
+  )
+  if (left <= 0) {
+    return (
+      <p className="text-xs font-medium text-red-600 dark:text-red-400">
+        Expired {when}. Revoke it, and create a new one if you still need it.
+      </p>
+    )
+  }
+  return (
+    <p
+      className={cn(
+        "text-xs",
+        left < EXPIRY_WARNING_MS
+          ? "font-medium text-amber-700 dark:text-amber-400"
+          : "text-ink-faint",
+      )}
+    >
+      Expires {when}
+    </p>
+  )
+}
+
 function NewTokenDialog({
   open,
   onClose,
@@ -344,12 +398,16 @@ function NewTokenDialog({
 }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState("Claude Code")
+  const [scope, setScope] = useState<Scope>("read")
+  const [days, setDays] = useState<Lifetime>(90)
   const [error, setError] = useState<string | null>(null)
   const create = useMutation({
     ...tokensCreateTokenMutation(),
     onSuccess: (t) => {
       invalidate(queryClient, "tokensListTokens")
       setName("Claude Code")
+      setScope("read")
+      setDays(90)
       onCreated(t)
     },
     onError: (e) => setError(apiErrorMessage(e)),
@@ -366,7 +424,7 @@ function NewTokenDialog({
         onSubmit={(e) => {
           e.preventDefault()
           setError(null)
-          create.mutate({ body: { name: name.trim() } })
+          create.mutate({ body: { name: name.trim(), scope, expires_in_days: days } })
         }}
       >
         <Field label="Name" htmlFor="token-name">
@@ -378,6 +436,41 @@ function NewTokenDialog({
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </Field>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-ink">Access</legend>
+          {(Object.keys(SCOPES) as Scope[]).map((s) => (
+            <label
+              key={s}
+              className={cn(
+                "flex cursor-pointer gap-3 rounded-md border p-3 text-sm transition-colors",
+                scope === s ? "border-brand-600 bg-brand-50" : "border-line hover:bg-muted",
+              )}
+            >
+              <input
+                type="radio"
+                name="token-scope"
+                className="mt-0.5 accent-brand-600"
+                checked={scope === s}
+                onChange={() => setScope(s)}
+              />
+              <span>
+                <span className="block font-medium">{SCOPES[s].label}</span>
+                <span className="block text-xs text-ink-soft">{SCOPES[s].hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <Field label="Expires" htmlFor="token-expires">
+          <Select
+            id="token-expires"
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value) as Lifetime)}
+          >
+            <option value={30}>In 30 days</option>
+            <option value={90}>In 90 days</option>
+            <option value={365}>In a year</option>
+          </Select>
         </Field>
         {error && (
           <p role="alert" className="text-sm text-red-600">
@@ -418,6 +511,11 @@ function TokenCreatedDialog({
       {token && (
         <div className="space-y-4">
           <CopyBlock label="Token" value={token.token} />
+          <p className="text-sm text-ink-soft">
+            {SCOPES[token.scope].label}. Works until{" "}
+            <time dateTime={token.expires_at}>{formatDateTime(token.expires_at)}</time>; create a
+            new one then.
+          </p>
           <CopyBlock label="Add Dealflow to Claude Code" value={command} />
           <div className="text-sm text-ink-soft">
             <p>
@@ -427,7 +525,8 @@ function TokenCreatedDialog({
               token.
             </p>
             <p className="mt-2 flex items-center gap-2">
-              <Badge>Tip</Badge> Treat it like a password. Anyone with it can read what you can.
+              <Badge>Tip</Badge> Treat it like a password. Anyone with it can read what you can
+              until it expires.
             </p>
           </div>
           <DialogFooter>

@@ -14,12 +14,14 @@ import inspect
 import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 from typing import Annotated, Any, cast, get_args
 
 import anyio.to_thread
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError as MCPToolError
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp_types import Tool as MCPTool
 from mcp_types import ToolAnnotations
 from pydantic import Field
 from sqlmodel import Session
@@ -29,7 +31,7 @@ from starlette.types import Receive, Scope, Send
 
 from app.agent.tools import TOOLS, Tool, ToolContext, ToolError
 from app.core.db import get_session
-from app.services.api_tokens import bearer, user_for_token
+from app.services.api_tokens import TokenRefused, bearer, token_access
 
 SOURCE = "mcp"  # AgentProposal.source for proposals made through MCP
 
@@ -43,9 +45,29 @@ own deals and activities, though every company and contact. Call pipeline_overvi
 and lost-reason ids. The propose_* tools don't \
 change anything: each creates a suggestion that the person approves or rejects in Dealflow's \
 Agent inbox, so say that's where to find it. Look a deal up with get_deal before proposing a \
-change to it."""
+change to it. A read-only token has no propose_* tools: if the person wants a change, tell them \
+to make it in Dealflow, or to create a token that can suggest changes."""
 
-server = MCPServer(name="Dealflow", title="Dealflow CRM", instructions=INSTRUCTIONS)
+READ_ONLY_REFUSAL = (
+    "This access token can only read, so it can't propose changes. Make the change in Dealflow, "
+    "or create a token that can suggest changes under Your account."
+)
+PROPOSING = {t.name for t in TOOLS if t.proposes_change}
+
+# the scope of the token on the request being handled, set by _Authenticated below
+_scope: ContextVar[str | None] = ContextVar("token_scope", default=None)
+
+
+class _Server(MCPServer):
+    async def list_tools(self) -> list[MCPTool]:
+        """A read-only token isn't offered the tools that propose changes."""
+        tools = await super().list_tools()
+        if _scope.get() == "read":
+            return [t for t in tools if t.name not in PROPOSING]
+        return tools
+
+
+server = _Server(name="Dealflow", title="Dealflow CRM", instructions=INSTRUCTIONS)
 
 
 @contextmanager
@@ -67,9 +89,13 @@ def _session() -> Iterator[Session]:
 def _call(tool: Tool, ctx: Context, args: dict[str, Any]) -> str:
     token = bearer((ctx.headers or {}).get("authorization"))
     with _session() as session:
-        user = user_for_token(session, token)
-        if user is None:  # revoked since the request was let in
-            raise MCPToolError("This access token is no longer valid")
+        try:  # checked again: it may have been revoked or expired since the request came in
+            access = token_access(session, token)
+        except TokenRefused as e:
+            raise MCPToolError(str(e)) from None
+        if tool.proposes_change and not access.can_suggest:
+            raise MCPToolError(READ_ONLY_REFUSAL)
+        user = access.user
         inp = tool.input_model.model_validate(args)
         try:
             result = tool.run(ToolContext(session=session, user=user, source=SOURCE), inp)
@@ -141,26 +167,26 @@ async def running() -> AsyncIterator[None]:
         yield
 
 
-def _token_is_valid(scope: Scope) -> bool:
+def _check_token(scope: Scope) -> str:
+    """The scope of the request's token; raises TokenRefused."""
     headers = {k.decode().lower(): v.decode() for k, v in scope["headers"]}
     with _session() as session:
-        return user_for_token(session, bearer(headers.get("authorization"))) is not None
+        return token_access(session, bearer(headers.get("authorization"))).scope
 
 
 class _Authenticated:
     """Refuse requests without a valid personal access token before they reach MCP."""
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http" and not await anyio.to_thread.run_sync(_token_is_valid, scope):
-            response = JSONResponse(
-                {
-                    "detail": "Send a Dealflow personal access token as 'Authorization: Bearer "
-                    "dfp_…'. Create one in Dealflow under Your account."
-                },
-                status_code=401,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-            return await response(scope, receive, send)
+        if scope["type"] == "http":
+            try:
+                token_scope = await anyio.to_thread.run_sync(_check_token, scope)
+            except TokenRefused as e:
+                response = JSONResponse(
+                    {"detail": str(e)}, status_code=401, headers={"WWW-Authenticate": "Bearer"}
+                )
+                return await response(scope, receive, send)
+            _scope.set(token_scope)
         await server.session_manager.handle_request(scope, receive, send)
 
 

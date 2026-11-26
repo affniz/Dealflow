@@ -1,16 +1,19 @@
 """Personal access tokens and the MCP server at /mcp."""
 
 import json
+from datetime import datetime, timedelta
 from typing import Any
 
-from app.models import Role
+from sqlmodel import select
+
+from app.models import ApiToken, Role, utcnow
 from tests.conftest import API
 
 HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
 
 
-def _token(client, h, name="Claude Code") -> str:
-    r = client.post(f"{API}/users/me/tokens", headers=h, json={"name": name})
+def _token(client, h, name="Claude Code", **extra) -> str:
+    r = client.post(f"{API}/users/me/tokens", headers=h, json={"name": name, **extra})
     assert r.status_code == 201, r.text
     return r.json()["token"]
 
@@ -81,7 +84,7 @@ def test_deactivated_users_token_stops_working(client, login, session):
 
 
 def test_initialize_and_list_tools(client, login):
-    token = _token(client, login(Role.agent))
+    token = _token(client, login(Role.agent), scope="suggest")
     r = _rpc(
         client,
         token,
@@ -128,7 +131,7 @@ def test_read_tools_follow_the_tokens_access(client, login, stages):
 def test_change_tools_create_proposals_for_the_inbox(client, login, stages):
     h = login(Role.agent)
     deal_id = _deal(client, h, stages[0], "Wipro pilot")
-    token = _token(client, h)
+    token = _token(client, h, scope="suggest")
 
     err, out = _call(
         client,
@@ -153,7 +156,7 @@ def test_change_tools_create_proposals_for_the_inbox(client, login, stages):
 def test_viewer_can_read_but_not_propose(client, login, stages):
     agent = login(Role.agent)
     deal_id = _deal(client, agent, stages[0])
-    token = _token(client, login(Role.viewer))
+    token = _token(client, login(Role.viewer), scope="suggest")  # the role still decides
     err, out = _call(
         client, token, "search_deals", status="open", stalled_only=False, mine_only=False, limit=5
     )
@@ -168,3 +171,75 @@ def test_invalid_arguments_are_reported_to_the_client(client, login):
     assert r.status_code == 200
     body = r.json()
     assert body.get("error") or body["result"]["isError"]
+
+
+def test_new_tokens_read_only_for_ninety_days_unless_asked(client, login):
+    h = login(Role.agent)
+    _token(client, h, "Default")
+    _token(client, h, "Script", scope="suggest", expires_in_days=30)
+    listed = {t["name"]: t for t in client.get(f"{API}/users/me/tokens", headers=h).json()}
+    assert listed["Default"]["scope"] == "read"
+    assert listed["Script"]["scope"] == "suggest"
+
+    def days_left(t):
+        expires = datetime.fromisoformat(t["expires_at"])
+        return round((expires - datetime.fromisoformat(t["created_at"])).total_seconds() / 86400)
+
+    assert days_left(listed["Default"]) == 90
+    assert days_left(listed["Script"]) == 30
+
+    for bad in ({"expires_in_days": 1000}, {"expires_in_days": None}, {"scope": "write"}):
+        r = client.post(f"{API}/users/me/tokens", headers=h, json={"name": "Bad", **bad})
+        assert r.status_code == 422, bad
+
+
+def test_read_only_tokens_arent_offered_or_allowed_to_propose(client, login, stages):
+    h = login(Role.agent)
+    deal_id = _deal(client, h, stages[0])
+    token = _token(client, h)  # read only
+
+    tools = {t["name"] for t in _rpc(client, token, "tools/list").json()["result"]["tools"]}
+    assert "search_deals" in tools
+    assert not {t for t in tools if t.startswith("propose_")}
+
+    # even when a client calls one anyway
+    err, text = _call(
+        client, token, "propose_move_stage", deal_id=deal_id, stage_id=stages[1], reason="Go"
+    )
+    assert err and "can only read" in text
+    assert client.get(f"{API}/proposals", headers=h, params={"status": "pending"}).json() == []
+
+
+def test_expired_tokens_stop_working_and_say_so(client, login, session):
+    h = login(Role.agent)
+    token = _token(client, h)
+    assert _rpc(client, token, "tools/list").status_code == 200
+
+    row = session.exec(select(ApiToken)).one()
+    row.expires_at = utcnow() - timedelta(minutes=1)
+    session.add(row)
+    session.commit()
+
+    r = _rpc(client, token, "tools/list")
+    assert r.status_code == 401
+    assert r.json()["detail"].startswith("This access token expired on ")
+    # still listed, so the person can see what happened and revoke it
+    [listed] = client.get(f"{API}/users/me/tokens", headers=h).json()
+    assert datetime.fromisoformat(listed["expires_at"]) < utcnow()
+
+
+def test_expired_tokens_dont_count_toward_the_limit(client, login, session, monkeypatch):
+    from app.api.routes import tokens
+
+    monkeypatch.setattr(tokens, "MAX_TOKENS", 2)
+    h = login(Role.agent)
+    _token(client, h, "One")
+    _token(client, h, "Two")
+    r = client.post(f"{API}/users/me/tokens", headers=h, json={"name": "Three"})
+    assert r.status_code == 409
+
+    old = session.exec(select(ApiToken).where(ApiToken.name == "One")).one()
+    old.expires_at = utcnow() - timedelta(days=1)
+    session.add(old)
+    session.commit()
+    _token(client, h, "Three")

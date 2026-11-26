@@ -197,7 +197,10 @@ class ApiToken(SQLModel, table=True):
     token_hash: str = Field(max_length=64, unique=True)
     # the first characters, so people can tell their tokens apart
     prefix: str = Field(max_length=16)
+    # what it may do: "read" looks things up; "suggest" also proposes changes for approval
+    scope: str = Field(max_length=20)
     created_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime
     last_used_at: datetime | None = None
 
 
@@ -234,15 +237,29 @@ class LoginFailure(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow, index=True)
 
 
+# "read": search and look things up. "suggest": that, and propose changes for the person to
+# approve. Neither changes anything directly: every change goes through the Agent inbox.
+TokenScope = Literal["read", "suggest"]
+TOKEN_LIFETIMES_DAYS = (30, 90, 365)
+
+
 class ApiTokenCreate(SQLModel):
     name: str = Field(min_length=1, max_length=100)
+    scope: TokenScope = PydField(
+        default="read", description="read: look things up; suggest: also propose changes"
+    )
+    expires_in_days: Literal[30, 90, 365] = PydField(
+        default=90, description="How long the token works for"
+    )
 
 
 class ApiTokenPublic(SQLModel):
     id: int
     name: str
     prefix: str
+    scope: TokenScope
     created_at: datetime
+    expires_at: datetime
     last_used_at: datetime | None
 
 
