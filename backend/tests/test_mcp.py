@@ -9,7 +9,7 @@ from sqlmodel import select
 
 from app.core.config import settings
 from app.mcp_server import server
-from app.models import ApiToken, Role, utcnow
+from app.models import ApiToken, Role, User, utcnow
 from tests.conftest import API
 
 HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
@@ -289,3 +289,80 @@ def test_hourly_cleanup_deletes_tokens_a_month_after_they_expire(client, login, 
     assert purge_trash_job(session)["expired_tokens"] == 1
     listed = {t["name"] for t in client.get(f"{API}/users/me/tokens", headers=h).json()}
     assert listed == {"Live", "Lately"}
+
+
+def _expire_in(session, name: str, days: float, used: bool = True) -> None:
+    row = session.exec(select(ApiToken).where(ApiToken.name == name)).one()
+    row.expires_at = utcnow() + timedelta(days=days)
+    row.last_used_at = utcnow() - timedelta(days=1) if used else None
+    session.add(row)
+    session.commit()
+
+
+def _emails(smtp) -> list[tuple[Any, list[str]]]:
+    return [s for s in smtp.sent if isinstance(s, tuple) and s[0] != "login"]  # type: ignore[misc]
+
+
+def test_claude_is_told_in_a_tokens_last_week(client, login, session):
+    h = login(Role.agent)
+    token = _token(client, h, "Laptop")
+    args = {"status": "open", "stalled_only": False, "mine_only": False, "limit": 5}
+    err, out = _call(client, token, "search_deals", **args)
+    assert not err and "notice" not in out
+
+    _expire_in(session, "Laptop", days=3)
+    err, out = _call(client, token, "search_deals", **args)
+    assert not err and out["notice"].startswith("This access token stops working on ")
+
+
+def test_people_are_emailed_once_before_a_token_they_use_expires(client, login, session, smtp):
+    from app.worker import token_expiry_job
+
+    smtp.enable()
+    h = login(Role.agent, email="arjun@example.com")
+    for name in ("Laptop", "Desktop", "Spare", "Later"):
+        _token(client, h, name)
+    _expire_in(session, "Laptop", days=3)
+    _expire_in(session, "Desktop", days=6)
+    _expire_in(session, "Spare", days=3, used=False)  # nothing stops working: no email
+    _expire_in(session, "Later", days=10)
+    # someone who has left isn't emailed about theirs
+    _token(client, login(Role.agent, email="left@example.com"), "Old")
+    _expire_in(session, "Old", days=3)
+    left = session.exec(select(User).where(User.email == "left@example.com")).one()
+    left.is_active = False
+    session.add(left)
+    session.commit()
+
+    assert token_expiry_job(session) == {"emails_sent": 1}
+    [(msg, to)] = _emails(smtp)
+    assert to == ["arjun@example.com"]
+    assert msg["Subject"] == "Dealflow: 2 of your access tokens expire soon"
+    body = msg.get_content()
+    assert "- Laptop (dfp_" in body and "- Desktop (dfp_" in body
+    assert "Spare" not in body and "Later" not in body
+    assert "https://crm.example.com/account#connect-claude" in body
+
+    # once per token
+    assert token_expiry_job(session) == {"skipped": "No tokens expiring this week"}
+    assert len(_emails(smtp)) == 1
+
+
+def test_expiry_emails_need_email_set_up_and_retry_failures(
+    client, login, session, smtp, monkeypatch
+):
+    from app.services import api_tokens
+    from app.worker import token_expiry_job
+
+    _token(client, login(Role.agent), "Laptop")
+    _expire_in(session, "Laptop", days=3)
+    assert token_expiry_job(session) == {"skipped": "Email isn't set up"}
+
+    smtp.enable()
+    send_email = api_tokens.send_email
+    monkeypatch.setattr(api_tokens, "send_email", lambda *_: False)  # the mail server is down
+    result = token_expiry_job(session)
+    assert result["emails_sent"] == 0 and "tried again next hour" in str(result["problem"])
+
+    monkeypatch.setattr(api_tokens, "send_email", send_email)
+    assert token_expiry_job(session) == {"emails_sent": 1}

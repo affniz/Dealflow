@@ -102,6 +102,9 @@ Agents see only their own numbers everywhere; owners, admins and viewers see the
   90 days (the default) or a year. Read-only tokens aren't offered the proposal tools at all.
   The account page flags a token in its last week and once it has expired; 30 days after
   that, the hourly cleanup deletes it
+- In a token's last week, people hear about it where they use it: Claude's tool results carry a
+  reminder to pass on, and the owner gets one email about it (when SMTP is set up, and only for
+  tokens they've used)
 
 **Pipeline agent (AI)**
 - Every morning (07:00 in the team's time zone) it reviews each stalled deal as the deal's owner:
@@ -306,7 +309,8 @@ ID. When a request crashes, the person sees "something went wrong" with that ID 
 never the error itself.
 
 **Background jobs** (`backend/app/services/jobs.py`): every run of the stalled-deal check,
-the trash cleanup, the morning pipeline review and the demo reset is recorded with what it did
+the trash cleanup, the token expiry emails, the morning pipeline review and the demo reset is
+recorded with what it did
 or the error. Admins see this under **Settings > System**, and a banner across the app tells
 them when something needs attention:
 - a job's last run failed, or finished with a problem (some deal reviews failed, or the review

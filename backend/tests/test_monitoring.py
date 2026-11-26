@@ -252,7 +252,12 @@ def test_status_is_for_admins(client, login, monkeypatch):
     assert r.status_code == 200
     body = r.json()
     assert body["problems"] == []  # nothing has run yet, and this isn't production
-    assert [j["job"] for j in body["jobs"]] == ["pipeline_review", "check_rotting", "purge_trash"]
+    assert [j["job"] for j in body["jobs"]] == [
+        "pipeline_review",
+        "check_rotting",
+        "purge_trash",
+        "token_expiry",
+    ]
     assert body["jobs"][0]["schedule"] == "Off: the AI agents aren't set up"
 
 
@@ -267,9 +272,10 @@ def test_status_shows_what_needs_attention(session):
     assert status.problems[0].startswith("Morning pipeline review had a problem on ")
     assert status.problems[0].endswith(": 1 of 4 failed")
     assert status.problems[1].endswith(": RuntimeError: disk full")
-    review, rotting, trash = status.jobs
+    review, rotting, trash, token_expiry = status.jobs
     assert review.last_run.status == JobStatus.skipped and review.last_success_at is None
     assert trash.last_success_at is not None and rotting.schedule == "Every hour"
+    assert token_expiry.last_run is None
     assert JobStatus.skipped not in {r.status for r in status.recent_runs}
 
     # fixed: the next good run clears it
