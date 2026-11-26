@@ -47,7 +47,8 @@ and lost-reason ids. The propose_* tools don't \
 change anything: each creates a suggestion that the person approves or rejects in Dealflow's \
 Agent inbox, so say that's where to find it. Look a deal up with get_deal before proposing a \
 change to it. A read-only token has no propose_* tools: if the person wants a change, tell them \
-to make it in Dealflow, or to create a token that can suggest changes."""
+to make it in Dealflow, or to create a token that can suggest changes. A result may carry a \
+notice for the person (such as their token expiring soon): pass it on, once per conversation."""
 
 READ_ONLY_REFUSAL = (
     "This access token can only read, so it can't propose changes. Make the change in Dealflow, "
@@ -107,6 +108,9 @@ def _call(tool: Tool, ctx: Context, args: dict[str, Any]) -> str:
             session.rollback()
             raise MCPToolError(str(e)) from None
         session.commit()  # keeps a proposal the tool created
+    # in the token's last week, so Claude can tell the person in time to replace it
+    if (notice := access.expiry_notice()) and isinstance(result, dict):
+        result = {**result, "notice": notice}
     return json.dumps(result, default=str, ensure_ascii=False)
 
 

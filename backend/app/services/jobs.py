@@ -67,6 +67,10 @@ def jobs(ai_configured: bool) -> dict[str, Job]:
             "Every hour" if every == 3600 else f"Every {round(every / 60)} minutes",
         ),
         "purge_trash": Job("Trash cleanup", "Every hour"),
+        "token_expiry": Job(
+            "Token expiry emails",
+            "Every hour" if settings.emails_enabled else "Off: email isn't set up",
+        ),
     }
     if settings.DEMO_MODE:
         found["demo_refresh"] = Job("Demo data reset", "Daily")

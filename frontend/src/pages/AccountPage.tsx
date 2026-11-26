@@ -527,8 +527,8 @@ function TokenCreatedDialog({
           <CopyBlock label="Token" value={token.token} />
           <p className="text-sm text-ink-soft">
             {SCOPES[token.scope].label}. Works until{" "}
-            <time dateTime={token.expires_at}>{formatDateTime(token.expires_at)}</time>; create a
-            new one then.
+            <time dateTime={token.expires_at}>{formatDateTime(token.expires_at)}</time>. You'll be
+            reminded in its last week, in time to create a new one.
           </p>
           <CopyBlock label="Add Dealflow to Claude Code" value={command} />
           <div className="text-sm text-ink-soft">

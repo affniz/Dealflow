@@ -202,6 +202,8 @@ class ApiToken(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
     expires_at: datetime
     last_used_at: datetime | None = None
+    # when its owner was emailed that it's about to expire (app.services.api_tokens)
+    expiry_warned_at: datetime | None = None
 
 
 class AuthSession(SQLModel, table=True):

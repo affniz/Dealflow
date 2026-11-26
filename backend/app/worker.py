@@ -20,7 +20,7 @@ from app.core.logs import setup_logging as configure_logging
 from app.core.monitoring import init_sentry
 from app.demo_data import refresh
 from app.services import jobs
-from app.services.api_tokens import purge_expired_tokens
+from app.services.api_tokens import purge_expired_tokens, warn_expiring
 from app.services.daily import claim_daily_run
 from app.services.rotting import check_rotting
 from app.services.trash import purge_expired
@@ -48,6 +48,7 @@ celery_app.conf.update(
             "schedule": settings.ROTTING_CHECK_INTERVAL_SECONDS,
         },
         "purge-trash": {"task": "dealflow.purge_trash", "schedule": 3600},
+        "token-expiry": {"task": "dealflow.token_expiry", "schedule": 3600},
         # every hour, but it only runs once a day, from PIPELINE_REVIEW_HOUR on (see
         # app.services.daily): a host that slept through that hour runs it when it wakes
         "pipeline-review": {
@@ -68,6 +69,7 @@ def catch_up(**_: object) -> None:
     """Beat doesn't run what came due while the host was asleep, so do it now."""
     check_rotting_task.delay()
     purge_trash_task.delay()
+    token_expiry_task.delay()
     pipeline_review_if_due_task.delay()
 
 
@@ -90,6 +92,22 @@ def purge_trash_job(session: Session) -> dict[str, object]:
     purged["job_runs"] = jobs.prune(session)
     purged["expired_tokens"] = purge_expired_tokens(session)
     return purged
+
+
+def token_expiry_job(session: Session) -> dict[str, object]:
+    """Email people a week before a token they've used stops working (app.services.api_tokens)."""
+    if not settings.emails_enabled:
+        return {"skipped": "Email isn't set up"}
+    sent, failed = warn_expiring(session)
+    if not sent and not failed:
+        return {"skipped": "No tokens expiring this week"}
+    result: dict[str, object] = {"emails_sent": sent}
+    if failed:
+        result["problem"] = (
+            f"{failed} expiry email{'s' if failed > 1 else ''} couldn't be sent; "
+            "they'll be tried again next hour"
+        )
+    return result
 
 
 def demo_refresh_job(session: Session) -> dict[str, object]:
@@ -136,6 +154,11 @@ def check_rotting_task() -> dict[str, object]:
 @celery_app.task(name="dealflow.purge_trash")
 def purge_trash_task() -> dict[str, object]:
     return jobs.run_job("purge_trash", purge_trash_job)
+
+
+@celery_app.task(name="dealflow.token_expiry")
+def token_expiry_task() -> dict[str, object]:
+    return jobs.run_job("token_expiry", token_expiry_job)
 
 
 @celery_app.task(name="dealflow.demo_refresh")
